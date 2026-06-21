@@ -1,5 +1,15 @@
-import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo } from "./types.js";
+import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo, ChatMessage } from "./types.js";
 import { randomUUID } from "crypto";
+
+/**
+ * Map our OpenAI-style messages to the Cohere v2 chat schema. v2 uses a single
+ * `messages` array of `{ role, content }` with lowercase roles (system/user/
+ * assistant) — it has no v1 `preamble` field and no `message` field, and the
+ * system prompt is just a message with role "system".
+ */
+function toV2Messages(messages: ChatMessage[]): Array<{ role: string; content: string }> {
+  return messages.map((m) => ({ role: m.role, content: m.content }));
+}
 
 /**
  * Cohere provider — uses Cohere's native chat API.
@@ -28,18 +38,12 @@ export class CohereProvider implements Provider {
   }
 
   async chat(req: ChatRequest, modelId: string): Promise<ChatResponse> {
-    const system = req.messages.find((m) => m.role === "system")?.content;
-    const messages = req.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "user" ? "USER" : "CHATBOT", message: m.content }));
-
     const body: any = {
       model: modelId,
-      messages,
+      messages: toV2Messages(req.messages),
       max_tokens: req.max_tokens || 4096,
       temperature: req.temperature,
     };
-    if (system) body.preamble = system;
 
     const res = await fetch("https://api.cohere.com/v2/chat", {
       method: "POST",
@@ -56,10 +60,10 @@ export class CohereProvider implements Provider {
     }
 
     const data = await res.json() as any;
-    const text = data.text || data.message?.content?.[0]?.text || "";
+    const text = data.message?.content?.[0]?.text || "";
 
     return {
-      id: data.generation_id || randomUUID(),
+      id: data.id || randomUUID(),
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
       model: modelId,
@@ -73,19 +77,13 @@ export class CohereProvider implements Provider {
   }
 
   async *chatStream(req: ChatRequest, modelId: string): AsyncGenerator<StreamChunk> {
-    const system = req.messages.find((m) => m.role === "system")?.content;
-    const messages = req.messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "user" ? "USER" : "CHATBOT", message: m.content }));
-
     const body: any = {
       model: modelId,
-      messages,
+      messages: toV2Messages(req.messages),
       max_tokens: req.max_tokens || 4096,
       temperature: req.temperature,
       stream: true,
     };
-    if (system) body.preamble = system;
 
     const res = await fetch("https://api.cohere.com/v2/chat", {
       method: "POST",

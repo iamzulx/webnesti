@@ -95,8 +95,8 @@ async function seed() {
     { id: "moonshot/moonshot-v1-32k", providerId: "moonshot", displayName: "Moonshot v1 32K", contextLength: 32768, priceIn: 4e-6, priceOut: 4e-6, streaming: true, vision: false, tools: false },
     { id: "moonshot/moonshot-v1-128k", providerId: "moonshot", displayName: "Moonshot v1 128K", contextLength: 131072, priceIn: 8e-6, priceOut: 8e-6, streaming: true, vision: false, tools: false },
     // Z.AI (GLM)
-    { id: "zai/glm-4-plus", providerId: "zai", displayName: "GLM-4 Plus", contextLength: 128000, priceIn: 5e-5, priceOut: 5e-5, streaming: true, vision: true, tools: true },
-    { id: "zai/glm-4-flash", providerId: "zai", displayName: "GLM-4 Flash", contextLength: 128000, priceIn: 1e-4, priceOut: 1e-4, streaming: true, vision: true, tools: true },
+    { id: "zai/glm-4-plus", providerId: "zai", displayName: "GLM-4 Plus", contextLength: 128000, priceIn: 6e-7, priceOut: 2.2e-6, streaming: true, vision: true, tools: true },
+    { id: "zai/glm-4-flash", providerId: "zai", displayName: "GLM-4 Flash", contextLength: 128000, priceIn: 1e-7, priceOut: 1e-7, streaming: true, vision: true, tools: true },
     // MiniMax
     { id: "minimax/MiniMax-Text-01", providerId: "minimax", displayName: "MiniMax Text 01", contextLength: 1000000, priceIn: 1e-6, priceOut: 1e-6, streaming: true, vision: false, tools: false },
     // Qwen (Alibaba)

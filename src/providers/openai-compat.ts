@@ -59,7 +59,7 @@ export class OpenAICompatProvider implements Provider {
   async *chatStream(req: ChatRequest, modelId: string): AsyncGenerator<StreamChunk> {
     const stream = await this.client.chat.completions.create({
       model: modelId, messages: req.messages, temperature: req.temperature,
-      max_tokens: req.max_tokens, stream: true,
+      max_tokens: req.max_tokens, top_p: req.top_p, stream: true,
     });
     for await (const chunk of stream) {
       yield {
