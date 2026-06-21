@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNesti — AI Model API</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            nest: { 50:'#f0f9ff',100:'#e0f2fe',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
+    .card-hover { transition: all 0.2s; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body class="dark bg-gray-950 text-gray-100 min-h-screen">
+
+  <!-- NAV -->
+  <nav id="nav" class="hidden bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
+      <a href="#/" class="text-xl font-bold text-sky-400 flex items-center gap-2">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        WebNesti
+      </a>
+      <div class="flex gap-1 text-sm" id="navLinks"></div>
+      <div class="ml-auto flex items-center gap-3">
+        <span id="navBalance" class="text-sm text-gray-400"></span>
+        <span id="navUser" class="text-sm text-gray-300"></span>
+        <button onclick="logout()" class="text-sm text-red-400 hover:text-red-300">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- APP -->
+  <div id="app" class="max-w-7xl mx-auto px-4 py-6"></div>
+
+  <!-- TOAST -->
+  <div id="toast" class="fixed bottom-4 right-4 z-50 hidden"></div>
+
+  <script>
+    // ============ STATE ============
+    const state = {
+      user: null,
+      token: null,
+    };
+
+    // ============ API ============
+    const API = '';
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+      const res = await fetch(API + path, { ...opts, headers: { ...headers, ...opts.headers } });
+      if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error?.message || data.error || 'Request failed');
+      return data;
+    }
+
+    // ============ TOAST ============
+    function toast(msg, type = 'info') {
+      const el = document.getElementById('toast');
+      const colors = { info:'bg-sky-600', success:'bg-emerald-600', error:'bg-red-600' };
+      el.innerHTML = `<div class="${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg fade-in text-sm">${msg}</div>`;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+
+    // ============ AUTH ============
+    async function login(email) {
+      try {
+        const data = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email }) });
+        state.user = data.user;
+        state.token = data.token;
+        localStorage.setItem('webnesti_user', JSON.stringify(data.user));
+        localStorage.setItem('webnesti_token', data.token);
+        renderApp();
+        toast('Logged in!', 'success');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    function logout() {
+      state.user = null; state.token = null;
+      localStorage.removeItem('webnesti_user');
+      localStorage.removeItem('webnesti_token');
+      renderApp();
+    }
+
+    function checkAuth() {
+      const u = localStorage.getItem('webnesti_user');
+      const t = localStorage.getItem('webnesti_token');
+      if (u && t) { state.user = JSON.parse(u); state.token = t; }
+    }
+
+    // ============ PAGES ============
+
+    function loginPage() {
+      return `
+        <div class="min-h-[80vh] flex items-center justify-center fade-in">
+          <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+              <div class="text-5xl mb-4">⚡</div>
+              <h1 class="text-3xl font-bold text-white">WebNesti</h1>
+              <p class="text-gray-400 mt-2">AI Model API Provider</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-8">
+              <h2 class="text-xl font-semibold mb-6">Sign In</h2>
+              <form onsubmit="event.preventDefault(); login(document.getElementById('email').value)">
+                <label class="block text-sm text-gray-400 mb-2">Email</label>
+                <input id="email" type="email" value="admin@webnesti.com"
+                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white mb-4 focus:border-sky-500 focus:outline-none"
+                  placeholder="admin@webnesti.com" required>
+                <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-3 rounded-lg transition">
+                  Sign In
+                </button>
+              </form>
+              <p class="text-xs text-gray-500 mt-4 text-center">Demo: admin@webnesti.com</p>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    async function dashboardPage() {
+      const usage = await api('/api/usage').catch(() => ({ summary:{}, by_model:[] }));
+      const s = usage.summary || {};
+      return `
+        <div class="fade-in">
+          <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            ${statCard('Balance', '$' + (state.user?.balance || 0).toFixed(2), '💰')}
+            ${statCard('Requests', s.total_requests || 0, '📊')}
+            ${statCard('Tokens', (s.total_tokens || 0).toLocaleString(), '🔤')}
+            ${statCard('Avg Latency', Math.round(s.avg_latency || 0) + 'ms', '⚡')}
+          </div>
+          <h2 class="text-lg font-semibold mb-4">Usage by Model</h2>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-gray-800 text-gray-400">
+                <th class="text-left px-4 py-3">Model</th><th class="text-right px-4 py-3">Requests</th><th class="text-right px-4 py-3">Tokens</th><th class="text-right px-4 py-3">Cost</th>
+              </tr></thead>
+              <tbody>${(usage.by_model || []).map(m => `
+                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td class="px-4 py-3 font-medium">${m.model_id}</td>
+                  <td class="px-4 py-3 text-right">${m.requests}</td>
+                  <td class="text-right px-4 py-3">${(m.total_tokens||0).toLocaleString()}</td>
+                  <td class="text-right px-4 py-3 text-emerald-400">$${(m.cost||0).toFixed(6)}</td>
+                </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No usage data yet</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    async function modelsPage() {
+      const data = await api('/v1/models');
+      const models = data.data || [];
+      const grouped = {};
+      models.forEach(m => { const p = m.owned_by; (grouped[p] = grouped[p] || []).push(m); });
+      return `
+        <div class="fade-in">
+          <h1 class="text-2xl font-bold mb-2">Models</h1>
+          <p class="text-gray-400 mb-6">${models.length} models across ${Object.keys(grouped).length} providers</p>
+          ${Object.entries(grouped).map(([provider, list]) => `
+            <div class="mb-8">
+              <h2 class="text-lg font-semibold mb-3 capitalize flex items-center gap-2">
+                ${providerIcon(provider)} ${provider}
+              </h2>
+              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${list.map(m => `
+                  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 card-hover">
+                    <div class="font-semibold text-white mb-1">${m.id.split('/').pop()}</div>
+                    <div class="text-xs text-gray-500 mb-3">${m.id}</div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                      ${m.capabilities?.streaming ? badge('Stream','sky') : ''}
+                      ${m.capabilities?.vision ? badge('Vision','purple') : ''}
+                      ${m.capabilities?.tools ? badge('Tools','amber') : ''}
+                    </div>
+                    <div class="text-xs text-gray-400">
+                      Context: <span class="text-white">${(m.context_length||0).toLocaleString()}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">
+                      Input: <span class="text-emerald-400">$${(m.pricing?.prompt * 1000000 || 0).toFixed(2)}/M</span> ·
+                      Output: <span class="text-emerald-400">$${(m.pricing?.completion * 1000000 || 0).toFixed(2)}/M</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    async function keysPage() {
+      const data = await api('/api/keys');
+      const keys = data.data || [];
+      return `
+        <div class="fade-in">
+          <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">API Keys</h1>
+            <button onclick="createKey()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+              + Create Key
+            </button>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-gray-800 text-gray-400">
+                <th class="text-left px-4 py-3">Prefix</th><th class="text-left px-4 py-3">Name</th>
+                <th class="text-right px-4 py-3">Rate</th><th class="text-center px-4 py-3">Status</th>
+                <th class="text-right px-4 py-3">Created</th>
+              </tr></thead>
+              <tbody>${keys.map(k => `
+                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td class="px-4 py-3 font-mono text-sky-400">${k.key_prefix}...</td>
+                  <td class="px-4 py-3">${k.name || '-'}</td>
+                  <td class="px-4 py-3 text-right">${k.rate_limit}/min</td>
+                  <td class="px-4 py-3 text-center">${k.is_active ? badge('Active','green') : badge('Revoked','red')}</td>
+                  <td class="px-4 py-3 text-right text-gray-500">${(k.created_at||'').slice(0,10)}</td>
+                </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No keys yet</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    async function billingPage() {
+      const bal = await api('/api/billing/balance').catch(() => ({ balance: state.user?.balance || 0 }));
+      const txData = await api('/api/billing/transactions').catch(() => ({ data: [] }));
+      return `
+        <div class="fade-in">
+          <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">Billing</h1>
+            <button onclick="topUp()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+              + Top Up
+            </button>
+          </div>
+          <div class="bg-gradient-to-r from-sky-900 to-blue-900 rounded-xl p-6 mb-6 border border-sky-800">
+            <div class="text-sm text-sky-200 mb-1">Current Balance</div>
+            <div class="text-4xl font-bold text-white">$${(bal.balance || 0).toFixed(2)}</div>
+            <div class="text-sm text-sky-300 mt-1">Tier: ${state.user?.tier || 'free'}</div>
+          </div>
+          <h2 class="text-lg font-semibold mb-4">Transactions</h2>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-gray-800 text-gray-400">
+                <th class="text-left px-4 py-3">Date</th><th class="text-left px-4 py-3">Type</th>
+                <th class="text-left px-4 py-3">Description</th><th class="text-right px-4 py-3">Amount</th>
+              </tr></thead>
+              <tbody>${(txData.data || []).map(t => `
+                <tr class="border-b border-gray-800/50">
+                  <td class="px-4 py-3 text-gray-500">${(t.created_at||'').slice(0,16)}</td>
+                  <td class="px-4 py-3">${badge(t.type, t.type.includes('topup')||t.type.includes('settled')?'green':'blue')}</td>
+                  <td class="px-4 py-3 text-gray-300">${t.description || '-'}</td>
+                  <td class="px-4 py-3 text-right ${t.amount > 0 ? 'text-emerald-400' : 'text-red-400'}">$${t.amount.toFixed(2)}</td>
+                </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No transactions</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    async function pricingPage() {
+      const data = await api('/v1/models');
+      const models = data.data || [];
+      return `
+        <div class="fade-in">
+          <h1 class="text-2xl font-bold mb-2">Pricing</h1>
+          <p class="text-gray-400 mb-6">All prices per million tokens. ${10}% markup included.</p>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-gray-800 text-gray-400">
+                <th class="text-left px-4 py-3">Model</th><th class="text-left px-4 py-3">Provider</th>
+                <th class="text-right px-4 py-3">Context</th><th class="text-right px-4 py-3">Input $/M</th>
+                <th class="text-right px-4 py-3">Output $/M</th><th class="text-center px-4 py-3">Features</th>
+              </tr></thead>
+              <tbody>${models.map(m => `
+                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td class="px-4 py-3 font-medium">${m.id.split('/').pop()}</td>
+                  <td class="px-4 py-3 capitalize text-gray-400">${m.owned_by}</td>
+                  <td class="px-4 py-3 text-right">${(m.context_length||0).toLocaleString()}</td>
+                  <td class="px-4 py-3 text-right text-emerald-400">$${(m.pricing?.prompt * 1000000 || 0).toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right text-emerald-400">$${(m.pricing?.completion * 1000000 || 0).toFixed(2)}</td>
+                  <td class="px-4 py-3 text-center">
+                    ${m.capabilities?.streaming ? badge('⚡','sky') : ''}
+                    ${m.capabilities?.vision ? badge('👁','purple') : ''}
+                    ${m.capabilities?.tools ? badge('🔧','amber') : ''}
+                  </td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    // ============ HELPERS ============
+    function statCard(label, value, icon) {
+      return `<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 card-hover">
+        <div class="text-2xl mb-2">${icon}</div>
+        <div class="text-2xl font-bold text-white">${value}</div>
+        <div class="text-sm text-gray-400">${label}</div>
+      </div>`;
+    }
+
+    function badge(text, color) {
+      const colors = { sky:'bg-sky-900 text-sky-300', green:'bg-emerald-900 text-emerald-300', red:'bg-red-900 text-red-300',
+        purple:'bg-purple-900 text-purple-300', amber:'bg-amber-900 text-amber-300', blue:'bg-blue-900 text-blue-300' };
+      return `<span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${colors[color]||colors.sky}">${text}</span>`;
+    }
+
+    function providerIcon(p) {
+      const icons = { openai:'🟢', anthropic:'🟠', google:'🔵', deepseek:'🟣' };
+      return icons[p] || '⚪';
+    }
+
+    async function createKey() {
+      const name = prompt('Key name:');
+      if (!name) return;
+      try {
+        const data = await api('/api/keys', { method:'POST', body: JSON.stringify({ name }) });
+        toast(`Key created: ${data.key_prefix}... — Save: ${data.key}`, 'success');
+        navigate('keys');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    async function topUp() {
+      const amount = prompt('Top-up amount ($):');
+      if (!amount || isNaN(amount)) return;
+      try {
+        await api('/api/billing/topup', { method:'POST', body: JSON.stringify({ amount: parseFloat(amount) }) });
+        toast(`$${amount} added!`, 'success');
+        state.user.balance = (state.user.balance || 0) + parseFloat(amount);
+        localStorage.setItem('webnesti_user', JSON.stringify(state.user));
+        navigate('billing');
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // ============ ROUTER ============
+    const routes = {
+      '':       { page: dashboardPage, label: 'Dashboard', icon: '📊' },
+      'models': { page: modelsPage, label: 'Models', icon: '🤖' },
+      'keys':   { page: keysPage, label: 'API Keys', icon: '🔑' },
+      'billing':{ page: billingPage, label: 'Billing', icon: '💳' },
+      'pricing':{ page: pricingPage, label: 'Pricing', icon: '💰' },
+    };
+
+    function navigate(route) {
+      window.location.hash = '#/' + route;
+    }
+
+    async function renderRoute() {
+      const hash = window.location.hash.replace('#/', '') || '';
+      const route = routes[hash];
+
+      if (!state.user) {
+        document.getElementById('nav').classList.add('hidden');
+        document.getElementById('app').innerHTML = loginPage();
+        return;
+      }
+
+      document.getElementById('nav').classList.remove('hidden');
+      document.getElementById('navUser').textContent = state.user.email;
+      document.getElementById('navBalance').textContent = '$' + (state.user.balance || 0).toFixed(2);
+
+      // Nav links
+      document.getElementById('navLinks').innerHTML = Object.entries(routes).map(([k, v]) =>
+        `<a href="#/${k}" class="px-3 py-1.5 rounded-lg text-sm ${hash===k?'bg-gray-800 text-white':'text-gray-400 hover:text-white'}">${v.icon} ${v.label}</a>`
+      ).join('');
+
+      if (route) {
+        try {
+          document.getElementById('app').innerHTML = '<div class="text-center py-20"><div class="animate-spin text-3xl">⏳</div></div>';
+          document.getElementById('app').innerHTML = await route.page();
+        } catch(e) {
+          document.getElementById('app').innerHTML = `<div class="text-center py-20 text-red-400">Error: ${e.message}</div>`;
+        }
+      }
+    }
+
+    function renderApp() { renderRoute(); }
+    window.addEventListener('hashchange', renderRoute);
+
+    // INIT
+    checkAuth();
+    renderApp();
+  </script>
+</body>
+</html>
