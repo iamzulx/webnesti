@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { dbGet, dbRun, dbAll } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { encryptSecret } from "../encryption.js";
 import { randomBytes } from "crypto";
 
 const monetization = new Hono();
@@ -48,7 +49,14 @@ monetization.post("/pricing/upgrade", async (c) => {
   const { tier } = body;
 
   if (!tier || !TIERS[tier]) {
-    return c.json({ error: "Invalid tier. Choose: free, starter, pro, enterprise" }, 400);
+    return c.json({ error: "Invalid tier. Choose: free, starter, pro" }, 400);
+  }
+
+  // Enterprise is not self-serve: it carries admin-equivalent capabilities and
+  // is provisioned manually. Letting users self-upgrade to it (by merely holding
+  // the tier balance) was a privilege-escalation path.
+  if (tier === "enterprise") {
+    return c.json({ error: "Enterprise plans are provisioned by sales. Contact support." }, 403);
   }
 
   const target = TIERS[tier];
@@ -155,8 +163,9 @@ monetization.post("/referral/apply", async (c) => {
 
 // GET /api/referral/leaderboard — top referrers
 monetization.get("/referral/leaderboard", (c) => {
+  // Do not expose emails (PII) on a leaderboard visible to every authenticated user.
   const top = dbAll(`
-    SELECT u.name, u.email, COUNT(ru.id) as referrals, SUM(ru.credit_amount) as earned
+    SELECT u.name, COUNT(ru.id) as referrals, SUM(ru.credit_amount) as earned
     FROM referrals r
     JOIN users u ON r.user_id = u.id
     LEFT JOIN referral_uses ru ON ru.referrer_id = r.user_id
@@ -176,10 +185,15 @@ monetization.post("/byok", async (c) => {
 
   if (!provider || !api_key) return c.json({ error: "provider and api_key required" }, 400);
 
-  // Store BYOK key (encrypted in production)
+  if (typeof api_key !== "string" || typeof provider !== "string") {
+    return c.json({ error: "provider and api_key must be strings" }, 400);
+  }
+
+  // Encrypt the third-party key at rest (AES-256-GCM). It must be recoverable to
+  // call the upstream provider, so a one-way hash is not usable here.
   const id = randomBytes(8).toString("hex");
   dbRun("INSERT INTO byok_keys (id, user_id, provider, key_hash, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
-    [id, user.id, provider, api_key]); // In production: encrypt the key
+    [id, user.id, provider, encryptSecret(api_key)]);
 
   return c.json({
     id,

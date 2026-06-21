@@ -16,6 +16,15 @@ if (isProduction && (INSECURE_JWT_SECRETS.has(jwtSecret) || jwtSecret.length < 3
   );
 }
 
+const DEFAULT_ENCRYPTION_KEY = "dev-encryption-key-change-me-32b!!";
+const encryptionKey = process.env.ENCRYPTION_KEY || DEFAULT_ENCRYPTION_KEY;
+
+if (isProduction && (encryptionKey === DEFAULT_ENCRYPTION_KEY || encryptionKey.length < 32)) {
+  throw new Error(
+    "ENCRYPTION_KEY must be set to a strong, random value (>= 32 chars) in production."
+  );
+}
+
 export const config = {
   isProduction,
   port: parseInt(process.env.PORT || "3000"),
@@ -24,7 +33,7 @@ export const config = {
   defaultMarkup: parseFloat(process.env.DEFAULT_MARKUP_PERCENT || "10"),
   midtransServerKey: process.env.MIDTRANS_SERVER_KEY || "",
   midtransIsProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
-  encryptionKey: process.env.ENCRYPTION_KEY || "dev-encryption-key-change-me-32b!!",
+  encryptionKey,
   corsOrigins: process.env.CORS_ORIGINS?.split(",").map(s => s.trim()) || ["https://webnesti.ai", "http://localhost:3000"],
   providers: {
     openai: { apiKey: process.env.OPENAI_API_KEY || "" },

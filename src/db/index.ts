@@ -29,10 +29,18 @@ export async function getDb(): Promise<Database> {
       password_hash TEXT NOT NULL,
       balance REAL DEFAULT 0 NOT NULL,
       tier TEXT DEFAULT 'free' NOT NULL,
+      is_admin INTEGER DEFAULT 0 NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
     )
   `);
+
+  // Migration: add is_admin to pre-existing databases. Admin access is a dedicated
+  // flag, never inferred from the (purchasable) tier. ALTER fails if the column
+  // already exists, so swallow that case.
+  try {
+    db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0 NOT NULL`);
+  } catch {}
 
   db.run(`
     CREATE TABLE IF NOT EXISTS api_keys (
