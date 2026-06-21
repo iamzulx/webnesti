@@ -15,12 +15,16 @@ export class OpenAIProvider implements Provider {
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);
     return [
+      { id: "gpt-5.5", object: "model", created: now, owned_by: "openai" },
+      { id: "gpt-5.4", object: "model", created: now, owned_by: "openai" },
+      { id: "gpt-5.4-mini", object: "model", created: now, owned_by: "openai" },
+      { id: "gpt-4.1", object: "model", created: now, owned_by: "openai" },
+      { id: "gpt-4.1-mini", object: "model", created: now, owned_by: "openai" },
+      { id: "gpt-4.1-nano", object: "model", created: now, owned_by: "openai" },
+      { id: "o3", object: "model", created: now, owned_by: "openai" },
+      { id: "o4-mini", object: "model", created: now, owned_by: "openai" },
       { id: "gpt-4o", object: "model", created: now, owned_by: "openai" },
       { id: "gpt-4o-mini", object: "model", created: now, owned_by: "openai" },
-      { id: "gpt-4-turbo", object: "model", created: now, owned_by: "openai" },
-      { id: "gpt-3.5-turbo", object: "model", created: now, owned_by: "openai" },
-      { id: "o1", object: "model", created: now, owned_by: "openai" },
-      { id: "o1-mini", object: "model", created: now, owned_by: "openai" },
     ];
   }
 

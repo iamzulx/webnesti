@@ -15,8 +15,9 @@ export class XAIProvider implements Provider {
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);
     return [
+      { id: "grok-3", object: "model", created: now, owned_by: "xai" },
+      { id: "grok-3-mini", object: "model", created: now, owned_by: "xai" },
       { id: "grok-2", object: "model", created: now, owned_by: "xai" },
-      { id: "grok-2-mini", object: "model", created: now, owned_by: "xai" },
     ];
   }
 

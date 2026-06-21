@@ -16,10 +16,12 @@ export class AnthropicProvider implements Provider {
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);
     return [
-      { id: "claude-sonnet-4-20250514", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-3-5-sonnet-20241022", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-3-5-haiku-20241022", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-3-opus-20240229", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-fable-5", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-opus-4-8", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-sonnet-4-6", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-haiku-4-5", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-opus-4-7", object: "model", created: now, owned_by: "anthropic" },
+      { id: "claude-sonnet-4-5", object: "model", created: now, owned_by: "anthropic" },
     ];
   }
 
