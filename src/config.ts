@@ -1,9 +1,28 @@
 import "dotenv/config";
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const INSECURE_JWT_SECRETS = new Set([
+  "",
+  "dev-secret-change-in-production",
+  "change-this-to-a-random-secret-in-production",
+]);
+
+const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-in-production";
+
+// Never allow a missing/placeholder JWT secret to be used in production: an
+// attacker who knows the default value can forge session tokens for any user.
+if (isProduction && (INSECURE_JWT_SECRETS.has(jwtSecret) || jwtSecret.length < 32)) {
+  throw new Error(
+    "JWT_SECRET must be set to a strong, random value (>= 32 chars) in production."
+  );
+}
+
 export const config = {
+  isProduction,
   port: parseInt(process.env.PORT || "3000"),
   host: process.env.HOST || "0.0.0.0",
-  jwtSecret: process.env.JWT_SECRET || "dev-secret-change-in-production",
+  jwtSecret,
   defaultMarkup: parseFloat(process.env.DEFAULT_MARKUP_PERCENT || "10"),
   providers: {
     openai: { apiKey: process.env.OPENAI_API_KEY || "" },

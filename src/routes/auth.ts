@@ -2,9 +2,12 @@ import { Hono } from "hono";
 import { dbGet, dbRun } from "../db/index.js";
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from "crypto";
 import { parse, serialize } from "cookie";
+import jwt from "jsonwebtoken";
 import { config } from "../config.js";
 
 const auth = new Hono();
+
+const SESSION_TTL_SECONDS = 86400; // 24h
 
 // --- Password helpers ---
 function hashPassword(password: string): string {
@@ -13,29 +16,85 @@ function hashPassword(password: string): string {
   return `${salt}:${hash}`;
 }
 
+// Precomputed hash of a random value, used to keep login timing constant when
+// the email is unknown (mitigates user enumeration via response time).
+const DUMMY_PASSWORD_HASH = hashPassword(randomBytes(32).toString("hex"));
+
 function verifyPassword(password: string, stored: string): boolean {
+  if (typeof stored !== "string") return false;
   const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+
   const derived = scryptSync(password, salt, 64).toString("hex");
-  return timingSafeEqual(Buffer.from(hash), Buffer.from(derived));
+  const hashBuf = Buffer.from(hash, "hex");
+  const derivedBuf = Buffer.from(derived, "hex");
+  // timingSafeEqual throws if the buffers differ in length, so guard first.
+  if (hashBuf.length !== derivedBuf.length) return false;
+  return timingSafeEqual(hashBuf, derivedBuf);
 }
 
 // --- JWT helpers ---
+// Tokens are signed and verified with an HMAC over config.jwtSecret so they
+// cannot be forged or tampered with by clients.
 function signJWT(payload: Record<string, any>): string {
-  // Simple JWT-like token (no library needed for basic auth)
-  // For production, use jsonwebtoken
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 86400 })).toString("base64url");
-  const sig = randomBytes(32).toString("hex"); // HMAC in real JWT, simplified here
-  return `${header}.${body}.${sig}`;
+  return jwt.sign(payload, config.jwtSecret, {
+    algorithm: "HS256",
+    expiresIn: SESSION_TTL_SECONDS,
+  });
 }
+
+function verifyJWT(token: string): jwt.JwtPayload {
+  // Pin the algorithm to block "alg: none" / algorithm-confusion attacks.
+  const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] });
+  if (typeof decoded === "string") throw new Error("Invalid token payload");
+  return decoded;
+}
+
+// --- Brute-force protection for auth endpoints ---
+// Simple per-IP fixed-window limiter. The main rate limiter only runs for
+// API-key contexts, leaving /login and /register open to credential stuffing.
+const AUTH_WINDOW_MS = 60_000;
+const AUTH_MAX_ATTEMPTS = 10;
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function clientIp(c: { req: { header: (n: string) => string | undefined } }): string {
+  const fwd = c.req.header("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return c.req.header("x-real-ip") || "unknown";
+}
+
+function authRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = authAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > AUTH_MAX_ATTEMPTS;
+}
+
+// Evict stale entries so the map cannot grow unbounded.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of Array.from(authAttempts.entries())) {
+    if (now > entry.resetAt) authAttempts.delete(ip);
+  }
+}, AUTH_WINDOW_MS).unref();
 
 // POST /api/auth/register
 auth.post("/register", async (c) => {
+  if (authRateLimited(clientIp(c))) {
+    return c.json({ error: "Too many attempts, try again later" }, 429);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const { email, password, name } = body;
 
   if (!email) return c.json({ error: "email required" }, 400);
-  if (!password || password.length < 6) return c.json({ error: "password must be at least 6 characters" }, 400);
+  if (typeof password !== "string" || password.length < 8) {
+    return c.json({ error: "password must be at least 8 characters" }, 400);
+  }
 
   // Check if user already exists
   const existing = dbGet("SELECT id FROM users WHERE email = ?", [email]);
@@ -71,19 +130,27 @@ auth.post("/register", async (c) => {
 
 // POST /api/auth/login
 auth.post("/login", async (c) => {
+  if (authRateLimited(clientIp(c))) {
+    return c.json({ error: "Too many attempts, try again later" }, 429);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const { email, password } = body;
 
   if (!email) return c.json({ error: "email required" }, 400);
+  if (typeof password !== "string" || !password) {
+    return c.json({ error: "password required" }, 400);
+  }
 
   const user = dbGet("SELECT * FROM users WHERE email = ?", [email]);
-  if (!user) return c.json({ error: "Invalid email or password" }, 401);
 
-  // If password provided, verify it
-  if (password) {
-    if (!verifyPassword(password, user.password_hash)) {
-      return c.json({ error: "Invalid email or password" }, 401);
-    }
+  // Always verify a password (against a dummy hash when the user is unknown)
+  // so the response time does not reveal whether the email exists, and never
+  // allow login without a valid password.
+  const stored = user?.password_hash ?? DUMMY_PASSWORD_HASH;
+  const ok = verifyPassword(password, stored);
+  if (!user || !ok) {
+    return c.json({ error: "Invalid email or password" }, 401);
   }
 
   // Generate JWT token
@@ -91,8 +158,9 @@ auth.post("/login", async (c) => {
 
   const cookie = serialize("session", token, {
     httpOnly: true,
+    secure: config.isProduction,
     path: "/",
-    maxAge: 86400,
+    maxAge: SESSION_TTL_SECONDS,
     sameSite: "lax",
   });
   c.header("Set-Cookie", cookie);
@@ -111,30 +179,23 @@ auth.get("/me", (c) => {
 
   if (!token) return c.json({ error: "Not authenticated" }, 401);
 
+  let payload: jwt.JwtPayload;
   try {
-    // Decode JWT payload
-    const parts = token.split(".");
-    if (parts.length !== 3) return c.json({ error: "Invalid token format" }, 401);
-
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-
-    // Check expiry
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return c.json({ error: "Token expired" }, 401);
-    }
-
-    const user = dbGet("SELECT id, email, name, balance, tier, created_at FROM users WHERE id = ?", [payload.sub]);
-    if (!user) return c.json({ error: "User not found" }, 404);
-
-    return c.json({ user });
+    // Verifies the HMAC signature and expiry; throws on tampering/expiry.
+    payload = verifyJWT(token);
   } catch {
     return c.json({ error: "Invalid token" }, 401);
   }
+
+  const user = dbGet("SELECT id, email, name, balance, tier, created_at FROM users WHERE id = ?", [payload.sub]);
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  return c.json({ user });
 });
 
 // POST /api/auth/logout
 auth.post("/logout", (c) => {
-  const cookie = serialize("session", "", { httpOnly: true, path: "/", maxAge: 0 });
+  const cookie = serialize("session", "", { httpOnly: true, secure: config.isProduction, path: "/", maxAge: 0 });
   c.header("Set-Cookie", cookie);
   return c.json({ message: "Logged out" });
 });
