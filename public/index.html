@@ -5,61 +5,119 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebNesti — AI Model API</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            nest: { 50:'#f0f9ff',100:'#e0f2fe',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' }
-          }
-        }
-      }
+      theme: { extend: { colors: { nest: { 50:'#f0f9ff',100:'#e0f2fe',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' } } } }
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
-    .card-hover { transition: all 0.2s; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; margin: 0; }
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; transition: all 0.15s; cursor: pointer; }
+    .card:hover { border-color: #374151; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .btn { padding: 8px 16px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.15s; border: none; }
+    .btn-primary { background: #0284c7; color: white; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+    .btn-ghost:hover { background: #1e293b; color: white; }
+    .btn-success { background: #059669; color: white; }
+    .btn-danger { background: #dc2626; color: white; }
+    .input { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: white; width: 100%; font-size: 14px; }
+    .input:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.2); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #064e3b; color: #6ee7b7; }
+    .badge-blue { background: #0c4a6e; color: #7dd3fc; }
+    .badge-purple { background: #4c1d95; color: #c4b5fd; }
+    .badge-amber { background: #78350f; color: #fcd34d; }
+    .badge-red { background: #7f1d1d; color: #fca5a5; }
+    .badge-gray { background: #1e293b; color: #94a3b8; }
+    .sidebar { width: 240px; background: #0f172a; border-right: 1px solid #1e293b; min-height: 100vh; position: fixed; left: 0; top: 0; z-index: 40; }
+    .main { margin-left: 240px; min-height: 100vh; }
+    .nav-item { padding: 10px 16px; border-radius: 8px; color: #94a3b8; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+    .nav-item:hover { background: #1e293b; color: white; }
+    .nav-item.active { background: #0c4a6e; color: white; }
+    .stat-card { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; display: flex; align-items: center; justify-content: center; }
+    .modal { background: #111827; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; }
+    .toast { position: fixed; bottom: 20px; right: 20px; z-index: 100; padding: 12px 20px; border-radius: 8px; font-size: 14px; animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .chat-msg { padding: 12px 16px; border-radius: 12px; margin-bottom: 8px; max-width: 80%; }
+    .chat-user { background: #0284c7; color: white; margin-left: auto; }
+    .chat-ai { background: #1e293b; color: #e2e8f0; }
     ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #1e293b; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    input[type="password"], input[type="email"], input[type="text"], input[type="number"] {
-      background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.75rem 1rem; color: white; width: 100%;
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
     }
-    input:focus { outline: none; border-color: #0ea5e9; }
   </style>
 </head>
-<body class="dark bg-gray-950 text-gray-100 min-h-screen">
+<body class="dark bg-gray-950 text-gray-100">
 
-  <!-- NAV -->
-  <nav id="nav" class="hidden bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4 flex-wrap">
-      <a href="#/" class="text-xl font-bold text-sky-400 flex items-center gap-2 shrink-0">
-        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        WebNesti
-      </a>
-      <div class="flex gap-1 text-sm flex-wrap" id="navLinks"></div>
-      <div class="ml-auto flex items-center gap-3 shrink-0">
-        <span id="navBalance" class="text-sm text-gray-400"></span>
-        <span id="navUser" class="text-sm text-gray-300"></span>
-        <button onclick="logout()" class="text-sm text-red-400 hover:text-red-300">Logout</button>
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="p-4 border-b border-gray-800">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold">W</div>
+        <div>
+          <div class="font-bold text-white text-sm">WebNesti</div>
+          <div class="text-xs text-gray-500">AI Model API</div>
+        </div>
       </div>
     </div>
-  </nav>
+    <div class="p-3 space-y-1" id="navItems">
+      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">📊 Dashboard</div>
+      <div class="nav-item" data-page="playground" onclick="navigate('playground')">🧪 Playground</div>
+      <div class="nav-item" data-page="models" onclick="navigate('models')">🤖 Models</div>
+      <div class="nav-item" data-page="keys" onclick="navigate('keys')">🔑 API Keys</div>
+      <div class="nav-item" data-page="usage" onclick="navigate('usage')">📈 Usage</div>
+      <div class="nav-item" data-page="billing" onclick="navigate('billing')">💳 Billing</div>
+      <div class="nav-item" data-page="pricing" onclick="navigate('pricing')">💰 Pricing</div>
+      <div class="nav-item" data-page="referral" onclick="navigate('referral')">🎁 Referral</div>
+      <div class="nav-item" data-page="docs" onclick="navigate('docs')">📖 API Docs</div>
+      <div class="nav-item" data-page="settings" onclick="navigate('settings')">⚙️ Settings</div>
+    </div>
+    <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-800">
+      <div id="userInfo" class="text-sm text-gray-400"></div>
+      <button onclick="logout()" class="btn btn-ghost w-full mt-2 text-sm">Logout</button>
+    </div>
+  </div>
 
-  <!-- APP -->
-  <div id="app" class="max-w-7xl mx-auto px-4 py-6"></div>
+  <!-- Main Content -->
+  <div class="main">
+    <!-- Top Bar -->
+    <div class="sticky top-0 z-30 bg-gray-950/80 backdrop-blur border-b border-gray-800 px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <button class="md:hidden text-gray-400" onclick="toggleSidebar()">☰</button>
+        <h1 id="pageTitle" class="text-lg font-semibold">Dashboard</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="balanceDisplay" class="text-sm text-gray-400"></div>
+        <div id="tierBadge"></div>
+      </div>
+    </div>
 
-  <!-- TOAST -->
-  <div id="toast" class="fixed bottom-4 right-4 z-50 hidden"></div>
+    <!-- Page Content -->
+    <div id="app" class="p-6 fade-in"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modalContent"></div>
+  </div>
 
   <script>
     // ============ STATE ============
-    const state = { user: null, token: null };
+    const state = { user: null, token: null, models: [], providers: {} };
 
     // ============ API ============
     async function api(path, opts = {}) {
@@ -72,28 +130,24 @@
       return data;
     }
 
-    // ============ HTML ESCAPE ============
-    function esc(v) {
-      return String(v == null ? '' : v)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    // ============ TOAST ============
+    // ============ UTILS ============
+    function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function toast(msg, type = 'info') {
+      const colors = { info: 'bg-sky-600', success: 'bg-emerald-600', error: 'bg-red-600' };
       const el = document.getElementById('toast');
-      const colors = { info:'bg-sky-600', success:'bg-emerald-600', error:'bg-red-600' };
-      el.innerHTML = `<div class="${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg fade-in text-sm">${esc(msg)}</div>`;
+      el.innerHTML = `<div class="${colors[type]} text-white">${esc(msg)}</div>`;
       el.classList.remove('hidden');
       setTimeout(() => el.classList.add('hidden'), 3000);
     }
+    function showModal(html) { document.getElementById('modalContent').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
 
     // ============ AUTH ============
     async function login(email, password) {
       try {
-        const data = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
-        state.user = data.user;
-        state.token = data.token;
+        const data = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        state.user = data.user; state.token = data.token;
         localStorage.setItem('webnesti_user', JSON.stringify(data.user));
         localStorage.setItem('webnesti_token', data.token);
         renderApp();
@@ -103,157 +157,269 @@
 
     async function register(email, password, name) {
       try {
-        const data = await api('/api/auth/register', { method:'POST', body: JSON.stringify({ email, password, name }) });
-        toast('Account created! Your API key: ' + data.api_key, 'success');
-        // Auto-login after register
-        await login(email, password);
+        const data = await api('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
+        showModal(`<h2 class="text-xl font-bold mb-4">Account Created!</h2>
+          <p class="text-gray-400 mb-2">Your API key (save it now):</p>
+          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-emerald-400 break-all mb-4">${esc(data.api_key)}</div>
+          <button onclick="closeModal(); login('${esc(email)}', '${esc(password)}')" class="btn btn-primary w-full">Continue to Dashboard</button>`);
       } catch(e) { toast(e.message, 'error'); }
     }
 
     function logout() {
       state.user = null; state.token = null;
-      localStorage.removeItem('webnesti_user');
-      localStorage.removeItem('webnesti_token');
+      localStorage.removeItem('webnesti_user'); localStorage.removeItem('webnesti_token');
       renderApp();
     }
-
     function checkAuth() {
-      const u = localStorage.getItem('webnesti_user');
-      const t = localStorage.getItem('webnesti_token');
+      const u = localStorage.getItem('webnesti_user'), t = localStorage.getItem('webnesti_token');
       if (u && t) { state.user = JSON.parse(u); state.token = t; }
     }
 
     // ============ PROVIDER ICONS ============
-    function providerIcon(p) {
-      const icons = {
-        openai:'🟢', anthropic:'🟠', google:'🔵', deepseek:'🟣',
-        meta:'🦙', xai:'✖️', mistral:'🌊', cohere:'🔷',
-        groq:'⚡', cerebras:'🧠', sambanova:'🟤', fireworks:'🔥',
-        together:'🤝', perplexity:'🔍', moonshot:'🌙', zai:'🇨🇳',
-        minimax:'🎯', qwen:'🏮'
-      };
-      return icons[p] || '⚪';
-    }
+    const ICONS = { openai:'🟢',anthropic:'🟠',google:'🔵',deepseek:'🟣',meta:'🦙',xai:'✖️',mistral:'🌊',cohere:'🔷',groq:'⚡',cerebras:'🧠',sambanova:'🟤',fireworks:'🔥',together:'🤝',perplexity:'🔍',moonshot:'🌙',zai:'🇨🇳',minimax:'🎯',qwen:'🏮' };
 
     // ============ PAGES ============
 
-    // --- Login + Register ---
+    // --- Auth Page ---
     function authPage() {
-      return `
-        <div class="min-h-[80vh] flex items-center justify-center fade-in">
-          <div class="w-full max-w-md">
-            <div class="text-center mb-8">
-              <div class="text-5xl mb-4">⚡</div>
-              <h1 class="text-3xl font-bold text-white">WebNesti</h1>
-              <p class="text-gray-400 mt-2">AI Model API Provider — 18 Providers, 47 Models</p>
+      return `<div class="min-h-screen flex items-center justify-center">
+        <div class="w-full max-w-sm">
+          <div class="text-center mb-8">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-sky-600 flex items-center justify-center text-3xl">⚡</div>
+            <h1 class="text-3xl font-bold text-white">WebNesti</h1>
+            <p class="text-gray-400 mt-1">AI Model API Provider</p>
+          </div>
+          <div class="card p-6">
+            <div class="flex mb-6 bg-gray-800 rounded-lg p-1">
+              <button onclick="showAuth('login')" id="tab-login" class="flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white">Sign In</button>
+              <button onclick="showAuth('register')" id="tab-register" class="flex-1 py-2 text-sm font-medium rounded-md text-gray-400">Sign Up</button>
             </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-8">
-              <div class="flex mb-6">
-                <button onclick="showAuthTab('login')" id="tab-login" class="flex-1 py-2 text-sm font-medium text-sky-400 border-b-2 border-sky-400">Sign In</button>
-                <button onclick="showAuthTab('register')" id="tab-register" class="flex-1 py-2 text-sm font-medium text-gray-400 border-b-2 border-transparent">Sign Up</button>
-              </div>
-              <div id="auth-form-login">
-                <form onsubmit="event.preventDefault(); login(document.getElementById('login-email').value, document.getElementById('login-pass').value)">
-                  <label class="block text-sm text-gray-400 mb-2">Email</label>
-                  <input id="login-email" type="email" placeholder="you@example.com" required class="mb-4">
-                  <label class="block text-sm text-gray-400 mb-2">Password</label>
-                  <input id="login-pass" type="password" placeholder="••••••••" required class="mb-4">
-                  <button type="submit" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-3 rounded-lg transition">Sign In</button>
-                </form>
-              </div>
-              <div id="auth-form-register" class="hidden">
-                <form onsubmit="event.preventDefault(); register(document.getElementById('reg-email').value, document.getElementById('reg-pass').value, document.getElementById('reg-name').value)">
-                  <label class="block text-sm text-gray-400 mb-2">Name</label>
-                  <input id="reg-name" type="text" placeholder="Your name" class="mb-4">
-                  <label class="block text-sm text-gray-400 mb-2">Email</label>
-                  <input id="reg-email" type="email" placeholder="you@example.com" required class="mb-4">
-                  <label class="block text-sm text-gray-400 mb-2">Password (min 8 chars)</label>
-                  <input id="reg-pass" type="password" placeholder="••••••••" required minlength="8" class="mb-4">
-                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-lg transition">Create Account</button>
-                </form>
-              </div>
+            <div id="auth-login">
+              <form onsubmit="event.preventDefault(); login(document.getElementById('login-email').value, document.getElementById('login-pass').value)">
+                <label class="block text-sm text-gray-400 mb-1">Email</label>
+                <input id="login-email" type="email" class="input mb-3" placeholder="you@example.com" required>
+                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <input id="login-pass" type="password" class="input mb-4" placeholder="••••••••" required>
+                <button type="submit" class="btn btn-primary w-full py-3">Sign In</button>
+              </form>
+            </div>
+            <div id="auth-register" class="hidden">
+              <form onsubmit="event.preventDefault(); register(document.getElementById('reg-email').value, document.getElementById('reg-pass').value, document.getElementById('reg-name').value)">
+                <label class="block text-sm text-gray-400 mb-1">Name</label>
+                <input id="reg-name" type="text" class="input mb-3" placeholder="Your name">
+                <label class="block text-sm text-gray-400 mb-1">Email</label>
+                <input id="reg-email" type="email" class="input mb-3" placeholder="you@example.com" required>
+                <label class="block text-sm text-gray-400 mb-1">Password (min 8 chars)</label>
+                <input id="reg-pass" type="password" class="input mb-4" placeholder="••••••••" required minlength="8">
+                <button type="submit" class="btn btn-success w-full py-3">Create Account</button>
+              </form>
             </div>
           </div>
-        </div>`;
+        </div>
+      </div>`;
     }
-
-    function showAuthTab(tab) {
-      document.getElementById('auth-form-login').classList.toggle('hidden', tab !== 'login');
-      document.getElementById('auth-form-register').classList.toggle('hidden', tab !== 'register');
-      document.getElementById('tab-login').className = tab === 'login' ? 'flex-1 py-2 text-sm font-medium text-sky-400 border-b-2 border-sky-400' : 'flex-1 py-2 text-sm font-medium text-gray-400 border-b-2 border-transparent';
-      document.getElementById('tab-register').className = tab === 'register' ? 'flex-1 py-2 text-sm font-medium text-emerald-400 border-b-2 border-emerald-400' : 'flex-1 py-2 text-sm font-medium text-gray-400 border-b-2 border-transparent';
+    function showAuth(tab) {
+      document.getElementById('auth-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('auth-register').classList.toggle('hidden', tab !== 'register');
+      document.getElementById('tab-login').className = tab === 'login' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400';
+      document.getElementById('tab-register').className = tab === 'register' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400';
     }
 
     // --- Dashboard ---
     async function dashboardPage() {
-      const usage = await api('/api/usage').catch(() => ({ summary:{}, by_model:[] }));
+      const [usage, budget] = await Promise.all([
+        api('/api/usage').catch(() => ({ summary:{}, by_model:[] })),
+        api('/api/budget/alerts').catch(() => ({ alerts:[] }))
+      ]);
       const s = usage.summary || {};
+      const bal = state.user?.balance || 0;
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            ${statCard('Balance', '$' + (state.user?.balance || 0).toFixed(2), '💰')}
-            ${statCard('Requests', s.total_requests || 0, '📊')}
-            ${statCard('Tokens', (s.total_tokens || 0).toLocaleString(), '🔤')}
-            ${statCard('Avg Latency', Math.round(s.avg_latency || 0) + 'ms', '⚡')}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          ${statCard('$' + bal.toFixed(2), 'Balance', '💰')}
+          ${statCard(s.total_requests || 0, 'Requests', '📊')}
+          ${statCard((s.total_tokens || 0).toLocaleString(), 'Tokens', '🔤')}
+          ${statCard(Math.round(s.avg_latency || 0) + 'ms', 'Avg Latency', '⚡')}
+        </div>
+        ${budget.alerts?.length ? `<div class="mb-6">${budget.alerts.map(a => `<div class="card p-3 mb-2 border-l-4 ${a.level === 'critical' ? 'border-red-500' : 'border-amber-500'}"><span class="text-sm">${esc(a.message)}</span></div>`).join('')}</div>` : ''}
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="card p-4">
+            <h3 class="font-semibold mb-3">Usage by Model</h3>
+            <div class="space-y-2">${(usage.by_model || []).map(m => `
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-300">${esc(m.model_id)}</span>
+                <span class="text-emerald-400">$${(m.cost||0).toFixed(4)}</span>
+              </div>`).join('') || '<div class="text-gray-500 text-sm">No usage yet</div>'}</div>
           </div>
-          <h2 class="text-lg font-semibold mb-4">Usage by Model</h2>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead><tr class="border-b border-gray-800 text-gray-400">
-                <th class="text-left px-4 py-3">Model</th><th class="text-right px-4 py-3">Requests</th><th class="text-right px-4 py-3">Tokens</th><th class="text-right px-4 py-3">Cost</th>
-              </tr></thead>
-              <tbody>${(usage.by_model || []).map(m => `
-                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td class="px-4 py-3 font-medium">${esc(m.model_id)}</td>
-                  <td class="px-4 py-3 text-right">${m.requests}</td>
-                  <td class="text-right px-4 py-3">${(m.total_tokens||0).toLocaleString()}</td>
-                  <td class="text-right px-4 py-3 text-emerald-400">$${(m.cost||0).toFixed(6)}</td>
-                </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No usage data yet</td></tr>'}
-              </tbody>
-            </table>
+          <div class="card p-4">
+            <h3 class="font-semibold mb-3">Quick Actions</h3>
+            <div class="space-y-2">
+              <button onclick="navigate('playground')" class="btn btn-ghost w-full text-left">🧪 Test a model</button>
+              <button onclick="navigate('keys')" class="btn btn-ghost w-full text-left">🔑 Create API key</button>
+              <button onclick="navigate('models')" class="btn btn-ghost w-full text-left">🤖 Browse ${state.models.length} models</button>
+              <button onclick="navigate('pricing')" class="btn btn-ghost w-full text-left">💰 View pricing</button>
+            </div>
           </div>
         </div>`;
     }
 
-    // --- Models ---
-    async function modelsPage() {
-      const data = await api('/v1/models');
-      const models = data.data || [];
-      const grouped = {};
-      models.forEach(m => { const p = m.owned_by; (grouped[p] = grouped[p] || []).push(m); });
+    // --- Playground ---
+    async function playgroundPage() {
+      if (!state.models.length) {
+        const data = await api('/v1/models');
+        state.models = data.data || [];
+      }
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-2">Models</h1>
-          <p class="text-gray-400 mb-6">${models.length} models across ${Object.keys(grouped).length} providers</p>
-          ${Object.entries(grouped).map(([provider, list]) => `
-            <div class="mb-8">
-              <h2 class="text-lg font-semibold mb-3 capitalize flex items-center gap-2">
-                ${providerIcon(provider)} ${esc(provider)} <span class="text-sm text-gray-500 font-normal">(${list.length})</span>
-              </h2>
-              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                ${list.map(m => `
-                  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 card-hover">
-                    <div class="font-semibold text-white mb-1">${esc(m.id.split('/').pop())}</div>
-                    <div class="text-xs text-gray-500 mb-3">${esc(m.id)}</div>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                      ${m.capabilities?.streaming ? badge('Stream','sky') : ''}
-                      ${m.capabilities?.vision ? badge('Vision','purple') : ''}
-                      ${m.capabilities?.tools ? badge('Tools','amber') : ''}
-                    </div>
-                    <div class="text-xs text-gray-400">
-                      Context: <span class="text-white">${(m.context_length||0).toLocaleString()}</span>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-1">
-                      Input: <span class="text-emerald-400">$${(m.pricing?.prompt * 1000000 || 0).toFixed(2)}/M</span> ·
-                      Output: <span class="text-emerald-400">$${(m.pricing?.completion * 1000000 || 0).toFixed(2)}/M</span>
-                    </div>
-                  </div>
-                `).join('')}
+        <div class="grid lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2">
+            <div class="card p-4" style="height: 500px; display:flex; flex-direction:column;">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold">Chat</h3>
+                <select id="playground-model" class="input" style="width:auto;">
+                  ${state.models.map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('')}
+                </select>
+              </div>
+              <div id="chat-messages" class="flex-1 overflow-y-auto space-y-2 mb-3 p-2" style="background:#0f172a; border-radius:8px;"></div>
+              <div class="flex gap-2">
+                <input id="chat-input" class="input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()">
+                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
               </div>
             </div>
-          `).join('')}
+          </div>
+          <div>
+            <div class="card p-4 mb-4">
+              <h3 class="font-semibold mb-3">Parameters</h3>
+              <label class="block text-sm text-gray-400 mb-1">Temperature</label>
+              <input id="param-temp" type="range" min="0" max="2" step="0.1" value="0.7" class="w-full mb-1">
+              <div class="text-xs text-gray-500 mb-3" id="temp-val">0.7</div>
+              <label class="block text-sm text-gray-400 mb-1">Max Tokens</label>
+              <input id="param-tokens" type="number" class="input mb-3" value="1024" min="1" max="128000">
+              <label class="block text-sm text-gray-400 mb-1">System Prompt</label>
+              <textarea id="param-system" class="input mb-3" rows="3" placeholder="You are a helpful assistant..."></textarea>
+            </div>
+            <div class="card p-4">
+              <h3 class="font-semibold mb-3">Model Info</h3>
+              <div id="model-info" class="text-sm text-gray-400">Select a model to see details</div>
+            </div>
+          </div>
+        </div>
+        <script>
+          document.getElementById('param-temp').addEventListener('input', e => {
+            document.getElementById('temp-val').textContent = e.target.value;
+          });
+          document.getElementById('playground-model').addEventListener('change', e => {
+            const m = ${JSON.stringify(state.models)}.find(x => x.id === e.target.value);
+            if (m) document.getElementById('model-info').innerHTML =
+              '<div class="space-y-1">' +
+              '<div>Context: <b>' + (m.context_length||0).toLocaleString() + '</b> tokens</div>' +
+              '<div>Input: <b>$' + ((m.pricing?.prompt||0)*1e6).toFixed(2) + '</b>/M</div>' +
+              '<div>Output: <b>$' + ((m.pricing?.completion||0)*1e6).toFixed(2) + '</b>/M</div>' +
+              '<div>Stream: ' + (m.capabilities?.streaming?'✅':'❌') + '</div>' +
+              '<div>Vision: ' + (m.capabilities?.vision?'✅':'❌') + '</div>' +
+              '<div>Tools: ' + (m.capabilities?.tools?'✅':'❌') + '</div>' +
+              '</div>';
+          });
+        <\/script>`;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      const msgs = document.getElementById('chat-messages');
+      msgs.innerHTML += `<div class="chat-msg chat-user">${esc(msg)}</div>`;
+      msgs.scrollTop = msgs.scrollHeight;
+
+      const model = document.getElementById('playground-model').value;
+      const temp = parseFloat(document.getElementById('param-temp').value);
+      const maxTokens = parseInt(document.getElementById('param-tokens').value);
+      const system = document.getElementById('param-system').value;
+
+      const messages = [];
+      if (system) messages.push({ role: 'system', content: system });
+      messages.push({ role: 'user', content: msg });
+
+      try {
+        const data = await api('/v1/chat/completions', {
+          method: 'POST',
+          body: JSON.stringify({ model, messages, temperature: temp, max_tokens: maxTokens })
+        });
+        const reply = data.choices?.[0]?.message?.content || 'No response';
+        msgs.innerHTML += `<div class="chat-msg chat-ai">${esc(reply)}</div>`;
+        if (data.webnesti) {
+          msgs.innerHTML += `<div class="text-xs text-gray-500 px-2">Cost: $${data.webnesti.cost_usd} · ${data.webnesti.latency_ms}ms</div>`;
+        }
+      } catch(e) {
+        msgs.innerHTML += `<div class="chat-msg chat-ai" style="background:#7f1d1d;">Error: ${esc(e.message)}</div>`;
+      }
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // --- Models ---
+    async function modelsPage() {
+      if (!state.models.length) {
+        const data = await api('/v1/models');
+        state.models = data.data || [];
+      }
+      const grouped = {};
+      state.models.forEach(m => { const p = m.owned_by; (grouped[p] = grouped[p] || []).push(m); });
+      return `
+        <div class="mb-4 flex items-center justify-between">
+          <div class="text-sm text-gray-400">${state.models.length} models across ${Object.keys(grouped).length} providers</div>
+          <input class="input" style="width:250px" placeholder="Search models..." oninput="filterModels(this.value)">
+        </div>
+        <div id="models-grid" class="space-y-6">
+          ${Object.entries(grouped).map(([p, list]) => `
+            <div class="provider-group" data-provider="${esc(p)}">
+              <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">${ICONS[p]||'⚪'} ${esc(p)} <span class="text-sm text-gray-500 font-normal">(${list.length})</span></h2>
+              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${list.map(m => `
+                  <div class="card p-4 model-card" data-model="${esc(m.id)}" onclick="showModelDetail('${esc(m.id)}')">
+                    <div class="font-semibold text-white mb-1">${esc(m.id.split('/').pop())}</div>
+                    <div class="text-xs text-gray-500 mb-2">${esc(m.id)}</div>
+                    <div class="flex gap-1 mb-2">
+                      ${m.capabilities?.streaming ? '<span class="badge badge-blue">Stream</span>' : ''}
+                      ${m.capabilities?.vision ? '<span class="badge badge-purple">Vision</span>' : ''}
+                      ${m.capabilities?.tools ? '<span class="badge badge-amber">Tools</span>' : ''}
+                    </div>
+                    <div class="text-xs text-gray-400">
+                      <span class="text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</span> / <span class="text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</span> per M
+                    </div>
+                  </div>`).join('')}
+              </div>
+            </div>`).join('')}
         </div>`;
+    }
+
+    function filterModels(q) {
+      q = q.toLowerCase();
+      document.querySelectorAll('.model-card').forEach(el => {
+        el.style.display = el.dataset.model.toLowerCase().includes(q) ? '' : 'none';
+      });
+      document.querySelectorAll('.provider-group').forEach(el => {
+        const visible = el.querySelectorAll('.model-card[style=""],.model-card:not([style])');
+        el.style.display = visible.length ? '' : 'none';
+      });
+    }
+
+    function showModelDetail(id) {
+      const m = state.models.find(x => x.id === id);
+      if (!m) return;
+      showModal(`
+        <h2 class="text-xl font-bold mb-4">${esc(m.id.split('/').pop())}</h2>
+        <div class="space-y-3 text-sm">
+          <div><span class="text-gray-400">ID:</span> <b>${esc(m.id)}</b></div>
+          <div><span class="text-gray-400">Provider:</span> ${ICONS[m.owned_by]||'⚪'} ${esc(m.owned_by)}</div>
+          <div><span class="text-gray-400">Context:</span> ${(m.context_length||0).toLocaleString()} tokens</div>
+          <div><span class="text-gray-400">Input:</span> <span class="text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</span>/M tokens</div>
+          <div><span class="text-gray-400">Output:</span> <span class="text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</span>/M tokens</div>
+          <div class="flex gap-2">
+            ${m.capabilities?.streaming ? '<span class="badge badge-blue">Streaming</span>' : ''}
+            ${m.capabilities?.vision ? '<span class="badge badge-purple">Vision</span>' : ''}
+            ${m.capabilities?.tools ? '<span class="badge badge-amber">Tools</span>' : ''}
+          </div>
+          <button onclick="closeModal(); navigate('playground'); document.getElementById('playground-model').value='${esc(m.id)}'" class="btn btn-primary w-full mt-2">🧪 Test in Playground</button>
+        </div>`);
     }
 
     // --- API Keys ---
@@ -261,111 +427,145 @@
       const data = await api('/api/keys');
       const keys = data.data || [];
       return `
-        <div class="fade-in">
-          <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold">API Keys</h1>
-            <button onclick="createKey()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-              + Create Key
-            </button>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead><tr class="border-b border-gray-800 text-gray-400">
-                <th class="text-left px-4 py-3">Prefix</th><th class="text-left px-4 py-3">Name</th>
-                <th class="text-right px-4 py-3">Rate</th><th class="text-center px-4 py-3">Status</th>
-                <th class="text-right px-4 py-3">Created</th>
-              </tr></thead>
-              <tbody>${keys.map(k => `
-                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td class="px-4 py-3 font-mono text-sky-400">${esc(k.key_prefix)}...</td>
-                  <td class="px-4 py-3">${esc(k.name) || '-'}</td>
-                  <td class="px-4 py-3 text-right">${k.rate_limit}/min</td>
-                  <td class="px-4 py-3 text-center">${k.is_active ? badge('Active','green') : badge('Revoked','red')}</td>
-                  <td class="px-4 py-3 text-right text-gray-500">${(k.created_at||'').slice(0,10)}</td>
-                </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No keys yet</td></tr>'}
-              </tbody>
-            </table>
-          </div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-sm text-gray-400">${keys.length} keys</div>
+          <button onclick="createKey()" class="btn btn-primary">+ Create Key</button>
+        </div>
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b border-gray-800 text-gray-400">
+              <th class="text-left px-4 py-3">Prefix</th><th class="text-left px-4 py-3">Name</th>
+              <th class="text-right px-4 py-3">Rate</th><th class="text-center px-4 py-3">Status</th>
+              <th class="text-right px-4 py-3">Created</th>
+            </tr></thead>
+            <tbody>${keys.map(k => `
+              <tr class="border-b border-gray-800/50 hover:bg-gray-800/20">
+                <td class="px-4 py-3 font-mono text-sky-400">${esc(k.key_prefix)}...</td>
+                <td class="px-4 py-3">${esc(k.name) || '-'}</td>
+                <td class="px-4 py-3 text-right">${k.rate_limit}/min</td>
+                <td class="px-4 py-3 text-center">${k.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Revoked</span>'}</td>
+                <td class="px-4 py-3 text-right text-gray-500">${(k.created_at||'').slice(0,10)}</td>
+              </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No keys yet</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    }
+
+    async function createKey() {
+      showModal(`
+        <h2 class="text-xl font-bold mb-4">Create API Key</h2>
+        <form onsubmit="event.preventDefault(); doCreateKey()">
+          <label class="block text-sm text-gray-400 mb-1">Key Name</label>
+          <input id="new-key-name" class="input mb-4" placeholder="e.g., my-app" required>
+          <button type="submit" class="btn btn-primary w-full">Create</button>
+        </form>`);
+    }
+
+    async function doCreateKey() {
+      const name = document.getElementById('new-key-name').value;
+      try {
+        const data = await api('/api/keys', { method: 'POST', body: JSON.stringify({ name }) });
+        showModal(`
+          <h2 class="text-xl font-bold mb-4">Key Created!</h2>
+          <p class="text-sm text-gray-400 mb-2">Save this key now — it won't be shown again:</p>
+          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-emerald-400 break-all mb-4">${esc(data.key)}</div>
+          <button onclick="closeModal(); navigate('keys')" class="btn btn-primary w-full">Done</button>`);
+      } catch(e) { toast(e.message, 'error'); }
+    }
+
+    // --- Usage ---
+    async function usagePage() {
+      const data = await api('/api/usage').catch(() => ({ summary:{}, by_model:[], recent:[] }));
+      const s = data.summary || {};
+      return `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          ${statCard(s.total_requests || 0, 'Total Requests', '📊')}
+          ${statCard((s.total_tokens || 0).toLocaleString(), 'Total Tokens', '🔤')}
+          ${statCard('$' + (s.total_cost || 0).toFixed(4), 'Total Cost', '💰')}
+          ${statCard(Math.round(s.avg_latency || 0) + 'ms', 'Avg Latency', '⚡')}
+        </div>
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b border-gray-800 text-gray-400">
+              <th class="text-left px-4 py-3">Time</th><th class="text-left px-4 py-3">Model</th>
+              <th class="text-right px-4 py-3">Tokens</th><th class="text-right px-4 py-3">Cost</th>
+              <th class="text-right px-4 py-3">Latency</th>
+            </tr></thead>
+            <tbody>${(data.recent || []).map(r => `
+              <tr class="border-b border-gray-800/50">
+                <td class="px-4 py-3 text-gray-500">${(r.created_at||'').slice(0,16)}</td>
+                <td class="px-4 py-3">${esc(r.model_id)}</td>
+                <td class="px-4 py-3 text-right">${(r.total_tokens||0).toLocaleString()}</td>
+                <td class="px-4 py-3 text-right text-emerald-400">$${(r.cost_usd||0).toFixed(6)}</td>
+                <td class="px-4 py-3 text-right">${r.latency_ms||0}ms</td>
+              </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No usage yet</td></tr>'}</tbody>
+          </table>
         </div>`;
     }
 
     // --- Billing ---
     async function billingPage() {
-      const usage = await api('/api/usage').catch(() => ({ user:{}, summary:{} }));
-      const txData = await api('/api/billing/transactions').catch(() => ({ data:[] }));
+      const [usage, txData] = await Promise.all([
+        api('/api/usage').catch(() => ({ user:{} })),
+        api('/api/billing/transactions').catch(() => ({ data:[] }))
+      ]);
       const bal = usage.user?.balance || state.user?.balance || 0;
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-6">Billing</h1>
-          <div class="bg-gradient-to-r from-sky-900 to-blue-900 rounded-xl p-6 mb-6 border border-sky-800">
-            <div class="text-sm text-sky-200 mb-1">Current Balance</div>
-            <div class="text-4xl font-bold text-white">$${bal.toFixed(2)}</div>
-            <div class="text-sm text-sky-300 mt-1">Tier: ${esc(state.user?.tier || 'free')}</div>
-          </div>
-          <h2 class="text-lg font-semibold mb-4">Transactions</h2>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead><tr class="border-b border-gray-800 text-gray-400">
-                <th class="text-left px-4 py-3">Date</th><th class="text-left px-4 py-3">Type</th>
-                <th class="text-left px-4 py-3">Description</th><th class="text-right px-4 py-3">Amount</th>
-              </tr></thead>
-              <tbody>${(txData.data || []).map(t => `
-                <tr class="border-b border-gray-800/50">
-                  <td class="px-4 py-3 text-gray-500">${(t.created_at||'').slice(0,16)}</td>
-                  <td class="px-4 py-3">${badge(t.type, t.type.includes('topup')||t.type.includes('settled')?'green':'blue')}</td>
-                  <td class="px-4 py-3 text-gray-300">${esc(t.description) || '-'}</td>
-                  <td class="px-4 py-3 text-right ${t.amount > 0 ? 'text-emerald-400' : 'text-red-400'}">$${t.amount.toFixed(2)}</td>
-                </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No transactions</td></tr>'}
-              </tbody>
-            </table>
-          </div>
+        <div class="card p-6 mb-6" style="background: linear-gradient(135deg, #0c4a6e, #1e3a5f);">
+          <div class="text-sm text-sky-200 mb-1">Current Balance</div>
+          <div class="text-4xl font-bold text-white">$${bal.toFixed(2)}</div>
+          <div class="text-sm text-sky-300 mt-1">Tier: ${esc(state.user?.tier || 'free')}</div>
+        </div>
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b border-gray-800 text-gray-400">
+              <th class="text-left px-4 py-3">Date</th><th class="text-left px-4 py-3">Type</th>
+              <th class="text-left px-4 py-3">Description</th><th class="text-right px-4 py-3">Amount</th>
+            </tr></thead>
+            <tbody>${(txData.data || []).map(t => `
+              <tr class="border-b border-gray-800/50">
+                <td class="px-4 py-3 text-gray-500">${(t.created_at||'').slice(0,16)}</td>
+                <td class="px-4 py-3"><span class="badge ${t.type.includes('topup')||t.type.includes('settled') ? 'badge-green' : 'badge-blue'}">${esc(t.type)}</span></td>
+                <td class="px-4 py-3 text-gray-300">${esc(t.description) || '-'}</td>
+                <td class="px-4 py-3 text-right ${t.amount > 0 ? 'text-emerald-400' : 'text-red-400'}">$${t.amount.toFixed(2)}</td>
+              </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No transactions</td></tr>'}</tbody>
+          </table>
         </div>`;
     }
 
-    // --- Pricing Tiers ---
+    // --- Pricing ---
     async function pricingPage() {
-      const tiers = await api('/api/pricing').catch(() => ({ tiers:[] }));
+      const [tiers, models] = await Promise.all([
+        api('/api/pricing').catch(() => ({ tiers:[] })),
+        api('/v1/models').catch(() => ({ data:[] }))
+      ]);
       const current = await api('/api/pricing/current').catch(() => ({}));
-      const models = await api('/v1/models').catch(() => ({ data:[] }));
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-2">Pricing</h1>
-          <p class="text-gray-400 mb-6">Your tier: <span class="text-sky-400 font-semibold">${esc(current.tier || 'free')}</span></p>
-
-          <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            ${(tiers.tiers || []).map(t => `
-              <div class="bg-gray-900 border ${t.name === current.tier ? 'border-sky-500' : 'border-gray-800'} rounded-xl p-5 card-hover">
-                <div class="text-lg font-bold text-white mb-1 capitalize">${esc(t.name)}</div>
-                <div class="text-2xl font-bold text-sky-400 mb-3">${t.markup_percent}% markup</div>
-                <div class="text-sm text-gray-400 mb-2">Min top-up: $${t.min_topup_usd}</div>
-                <div class="text-sm text-gray-400 mb-4">Rate: ${t.rate_limit_per_min}/min</div>
-                <ul class="text-xs text-gray-300 space-y-1">
-                  ${t.features.map(f => `<li>✓ ${esc(f)}</li>`).join('')}
-                </ul>
-                ${t.name === current.tier ? '<div class="mt-3 text-xs text-sky-400 font-medium">Current Plan</div>' : ''}
-              </div>
-            `).join('')}
-          </div>
-
-          <h2 class="text-lg font-semibold mb-4">Model Pricing (${models.data?.length || 0} models)</h2>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead><tr class="border-b border-gray-800 text-gray-400">
-                <th class="text-left px-4 py-3">Model</th><th class="text-left px-4 py-3">Provider</th>
-                <th class="text-right px-4 py-3">Context</th><th class="text-right px-4 py-3">Input $/M</th>
-                <th class="text-right px-4 py-3">Output $/M</th>
-              </tr></thead>
-              <tbody>${(models.data || []).map(m => `
-                <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td class="px-4 py-3 font-medium">${esc(m.id.split('/').pop())}</td>
-                  <td class="px-4 py-3 capitalize text-gray-400">${esc(m.owned_by)}</td>
-                  <td class="px-4 py-3 text-right">${(m.context_length||0).toLocaleString()}</td>
-                  <td class="px-4 py-3 text-right text-emerald-400">$${(m.pricing?.prompt * 1000000 || 0).toFixed(2)}</td>
-                  <td class="px-4 py-3 text-right text-emerald-400">$${(m.pricing?.completion * 1000000 || 0).toFixed(2)}</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
+        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          ${(tiers.tiers || []).map(t => `
+            <div class="card p-5 ${t.name === current.tier ? 'border-sky-500' : ''}">
+              <div class="text-lg font-bold text-white mb-1 capitalize">${esc(t.name)}</div>
+              <div class="text-2xl font-bold text-sky-400 mb-3">${t.markup_percent}%</div>
+              <div class="text-sm text-gray-400 mb-2">Min: $${t.min_topup_usd}</div>
+              <div class="text-sm text-gray-400 mb-4">Rate: ${t.rate_limit_per_min}/min</div>
+              <ul class="text-xs text-gray-300 space-y-1">${t.features.map(f => `<li>✓ ${esc(f)}</li>`).join('')}</ul>
+              ${t.name === current.tier ? '<div class="mt-3 badge badge-blue">Current</div>' : ''}
+            </div>`).join('')}
+        </div>
+        <h2 class="text-lg font-semibold mb-4">Model Pricing</h2>
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b border-gray-800 text-gray-400">
+              <th class="text-left px-4 py-3">Model</th><th class="text-left px-4 py-3">Provider</th>
+              <th class="text-right px-4 py-3">Input $/M</th><th class="text-right px-4 py-3">Output $/M</th>
+            </tr></thead>
+            <tbody>${(models.data || []).map(m => `
+              <tr class="border-b border-gray-800/50 hover:bg-gray-800/20 cursor-pointer" onclick="showModelDetail('${esc(m.id)}')">
+                <td class="px-4 py-3 font-medium">${esc(m.id.split('/').pop())}</td>
+                <td class="px-4 py-3 capitalize text-gray-400">${esc(m.owned_by)}</td>
+                <td class="px-4 py-3 text-right text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</td>
+                <td class="px-4 py-3 text-right text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</td>
+              </tr>`).join('')}</tbody>
+          </table>
         </div>`;
     }
 
@@ -373,176 +573,126 @@
     async function referralPage() {
       const ref = await api('/api/referral').catch(() => ({}));
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-6">Referral Program</h1>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
-            <div class="text-sm text-gray-400 mb-2">Your Referral Code</div>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">Your Referral</h3>
+            <div class="text-sm text-gray-400 mb-1">Code</div>
             <div class="text-2xl font-mono font-bold text-sky-400 mb-4">${esc(ref.code || 'N/A')}</div>
-            <div class="text-sm text-gray-400 mb-2">Referral Link</div>
-            <div class="bg-gray-800 rounded-lg p-3 font-mono text-sm text-emerald-400 mb-4 break-all">${esc(ref.referral_link || '')}</div>
-            <div class="grid grid-cols-3 gap-4">
-              ${statCard('Referrals', ref.referrals_count || 0, '👥')}
-              ${statCard('Earned', '$' + (ref.total_earned || 0).toFixed(2), '💰')}
-              ${statCard('Per Referral', '$' + (ref.reward_per_referral || 5), '🎁')}
+            <div class="text-sm text-gray-400 mb-1">Link</div>
+            <div class="bg-gray-800 p-2 rounded-lg font-mono text-xs text-emerald-400 mb-4 break-all">${esc(ref.referral_link || '')}</div>
+            <div class="grid grid-cols-3 gap-3">
+              ${statCard(ref.referrals_count || 0, 'Referrals', '👥')}
+              ${statCard('$' + (ref.total_earned || 0).toFixed(2), 'Earned', '💰')}
+              ${statCard('$' + (ref.reward_per_referral || 5), 'Reward', '🎁')}
             </div>
           </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 class="text-lg font-semibold mb-3">How it works</h2>
-            <ul class="text-sm text-gray-300 space-y-2">
-              <li>1. Share your referral link with friends</li>
-              <li>2. They sign up and make at least 1 API request</li>
-              <li>3. You get $5 credit, they get $2 credit</li>
-              <li>4. Account must be 24+ hours old to apply referral</li>
-            </ul>
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">How It Works</h3>
+            <div class="space-y-4">
+              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">1</div><div>Share your referral link</div></div>
+              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">2</div><div>Friend signs up & makes 1 API request</div></div>
+              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">3</div><div>You get $5, they get $2</div></div>
+            </div>
           </div>
         </div>`;
     }
 
-    // --- Budget ---
-    async function budgetPage() {
-      const budget = await api('/api/budget').catch(() => ({}));
-      const alerts = await api('/api/budget/alerts').catch(() => ({ alerts:[] }));
+    // --- API Docs ---
+    async function docsPage() {
+      const spec = await api('/v1/openapi.json').catch(() => ({}));
+      const paths = spec.paths || {};
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-6">Budget & Alerts</h1>
-          <div class="grid md:grid-cols-2 gap-4 mb-6">
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <div class="text-sm text-gray-400 mb-1">Balance</div>
-              <div class="text-3xl font-bold text-white">$${(budget.balance || 0).toFixed(2)}</div>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <div class="text-sm text-gray-400 mb-1">Monthly Spend</div>
-              <div class="text-3xl font-bold text-white">$${(budget.monthly_spend || 0).toFixed(4)}</div>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <div class="text-sm text-gray-400 mb-1">Daily Spend</div>
-              <div class="text-3xl font-bold text-white">$${(budget.daily_spend || 0).toFixed(4)}</div>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <div class="text-sm text-gray-400 mb-1">Monthly Budget Cap</div>
-              <div class="text-3xl font-bold text-white">${budget.monthly_budget ? '$' + budget.monthly_budget : 'Not set'}</div>
-            </div>
-          </div>
-          <h2 class="text-lg font-semibold mb-4">Alerts</h2>
-          ${(alerts.alerts || []).length ? alerts.alerts.map(a => `
-            <div class="bg-${a.level === 'critical' ? 'red' : 'amber'}-900/30 border border-${a.level === 'critical' ? 'red' : 'amber'}-800 rounded-lg p-4 mb-3">
-              <div class="font-medium text-${a.level === 'critical' ? 'red' : 'amber'}-300">${esc(a.message)}</div>
-            </div>
-          `).join('') : '<div class="text-gray-500 text-sm">No alerts — all good! ✅</div>'}
+        <div class="card p-6 mb-6">
+          <h3 class="font-semibold mb-2">API Base URL</h3>
+          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-sky-400">${window.location.origin}</div>
+        </div>
+        <div class="space-y-3">
+          ${Object.entries(paths).map(([path, methods]) => Object.entries(methods).map(([method, info]) => `
+            <div class="card p-4">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="badge ${method === 'get' ? 'badge-green' : method === 'post' ? 'badge-blue' : method === 'put' ? 'badge-amber' : 'badge-red'}">${method.toUpperCase()}</span>
+                <code class="font-mono text-sm">${esc(path)}</code>
+              </div>
+              <div class="text-sm text-gray-400">${esc(info.summary || '')}</div>
+            </div>`).join('')).join('')}
         </div>`;
     }
 
-    // --- Cost Calculator ---
-    async function calculatorPage() {
-      const models = await api('/v1/models').catch(() => ({ data:[] }));
+    // --- Settings ---
+    async function settingsPage() {
       return `
-        <div class="fade-in">
-          <h1 class="text-2xl font-bold mb-6">Cost Calculator</h1>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
-            <div class="grid md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label class="block text-sm text-gray-400 mb-2">Model</label>
-                <select id="calc-model" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white">
-                  ${(models.data || []).map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('')}
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm text-gray-400 mb-2">Input Tokens</label>
-                <input id="calc-input" type="number" value="1000" min="1" max="1000000">
-              </div>
-              <div>
-                <label class="block text-sm text-gray-400 mb-2">Output Tokens</label>
-                <input id="calc-output" type="number" value="500" min="1" max="1000000">
-              </div>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">Profile</h3>
+            <div class="space-y-3">
+              <div><span class="text-gray-400">Email:</span> ${esc(state.user?.email)}</div>
+              <div><span class="text-gray-400">Name:</span> ${esc(state.user?.name)}</div>
+              <div><span class="text-gray-400">Tier:</span> <span class="badge badge-blue">${esc(state.user?.tier)}</span></div>
+              <div><span class="text-gray-400">Balance:</span> $${(state.user?.balance || 0).toFixed(2)}</div>
             </div>
-            <button onclick="calculateCost()" class="bg-sky-600 hover:bg-sky-700 text-white px-6 py-2 rounded-lg transition">Calculate</button>
-            <div id="calc-result" class="mt-4"></div>
+          </div>
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">API Info</h3>
+            <div class="space-y-3">
+              <div><span class="text-gray-400">Base URL:</span> <code class="text-sky-400">${window.location.origin}</code></div>
+              <div><span class="text-gray-400">Auth:</span> <code class="text-sky-400">Bearer wn_...</code></div>
+              <div><span class="text-gray-400">Format:</span> OpenAI-compatible</div>
+              <div><span class="text-gray-400">Models:</span> ${state.models.length} available</div>
+            </div>
           </div>
         </div>`;
-    }
-
-    async function calculateCost() {
-      const model = document.getElementById('calc-model').value;
-      const input = document.getElementById('calc-input').value;
-      const output = document.getElementById('calc-output').value;
-      try {
-        const data = await api(`/api/calculate?model=${encodeURIComponent(model)}&input_tokens=${input}&output_tokens=${output}`);
-        document.getElementById('calc-result').innerHTML = `
-          <div class="bg-gray-800 rounded-lg p-4">
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div><span class="text-gray-400">Base cost:</span> <span class="text-white">$${data.cost?.base_usd}</span></div>
-              <div><span class="text-gray-400">Markup:</span> <span class="text-white">${data.cost?.markup_percent}%</span></div>
-              <div><span class="text-gray-400">Total:</span> <span class="text-emerald-400 font-bold text-lg">$${data.cost?.total_usd}</span></div>
-              <div><span class="text-gray-400">Affordable:</span> <span class="${data.affordable ? 'text-emerald-400' : 'text-red-400'}">${data.affordable ? '✅ Yes' : '❌ No'}</span></div>
-            </div>
-          </div>`;
-      } catch(e) { toast(e.message, 'error'); }
     }
 
     // ============ HELPERS ============
-    function statCard(label, value, icon) {
-      return `<div class="bg-gray-900 border border-gray-800 rounded-xl p-4 card-hover">
-        <div class="text-2xl mb-2">${icon}</div>
-        <div class="text-2xl font-bold text-white">${value}</div>
-        <div class="text-sm text-gray-400">${label}</div>
-      </div>`;
-    }
-
-    function badge(text, color) {
-      const colors = { sky:'bg-sky-900 text-sky-300', green:'bg-emerald-900 text-emerald-300', red:'bg-red-900 text-red-300',
-        purple:'bg-purple-900 text-purple-300', amber:'bg-amber-900 text-amber-300', blue:'bg-blue-900 text-blue-300' };
-      return `<span class="inline-block px-2 py-0.5 rounded text-xs font-medium ${colors[color]||colors.sky}">${esc(text)}</span>`;
-    }
-
-    async function createKey() {
-      const name = prompt('Key name:');
-      if (!name) return;
-      try {
-        const data = await api('/api/keys', { method:'POST', body: JSON.stringify({ name }) });
-        toast('Key created: ' + data.key_prefix + '... — Save: ' + data.key, 'success');
-        navigate('keys');
-      } catch(e) { toast(e.message, 'error'); }
+    function statCard(value, label, icon) {
+      return `<div class="stat-card"><div class="text-2xl mb-2">${icon}</div><div class="text-2xl font-bold text-white">${value}</div><div class="text-sm text-gray-400">${label}</div></div>`;
     }
 
     // ============ ROUTER ============
-    const routes = {
-      '':         { page: dashboardPage, label: 'Dashboard', icon: '📊' },
-      'models':   { page: modelsPage, label: 'Models', icon: '🤖' },
-      'keys':     { page: keysPage, label: 'API Keys', icon: '🔑' },
-      'billing':  { page: billingPage, label: 'Billing', icon: '💳' },
-      'pricing':  { page: pricingPage, label: 'Pricing', icon: '💰' },
-      'referral': { page: referralPage, label: 'Referral', icon: '🎁' },
-      'budget':   { page: budgetPage, label: 'Budget', icon: '📈' },
-      'calc':     { page: calculatorPage, label: 'Calculator', icon: '🧮' },
+    const pages = {
+      dashboard: { title: 'Dashboard', fn: dashboardPage },
+      playground: { title: 'Playground', fn: playgroundPage },
+      models: { title: 'Models', fn: modelsPage },
+      keys: { title: 'API Keys', fn: keysPage },
+      usage: { title: 'Usage', fn: usagePage },
+      billing: { title: 'Billing', fn: billingPage },
+      pricing: { title: 'Pricing', fn: pricingPage },
+      referral: { title: 'Referral', fn: referralPage },
+      docs: { title: 'API Docs', fn: docsPage },
+      settings: { title: 'Settings', fn: settingsPage },
     };
 
-    function navigate(route) { window.location.hash = '#/' + route; }
+    function navigate(page) {
+      window.location.hash = '#/' + page;
+    }
 
     async function renderRoute() {
-      const hash = window.location.hash.replace('#/', '') || '';
-      const route = routes[hash];
-
       if (!state.user) {
-        document.getElementById('nav').classList.add('hidden');
+        document.getElementById('sidebar').style.display = 'none';
+        document.querySelector('.main').style.marginLeft = '0';
         document.getElementById('app').innerHTML = authPage();
         return;
       }
+      document.getElementById('sidebar').style.display = '';
+      document.querySelector('.main').style.marginLeft = '';
 
-      document.getElementById('nav').classList.remove('hidden');
-      document.getElementById('navUser').textContent = state.user.email;
-      document.getElementById('navBalance').textContent = '$' + (state.user.balance || 0).toFixed(2);
+      const hash = window.location.hash.replace('#/', '') || 'dashboard';
+      const page = pages[hash] || pages.dashboard;
 
-      document.getElementById('navLinks').innerHTML = Object.entries(routes).map(([k, v]) =>
-        `<a href="#/${k}" class="px-3 py-1.5 rounded-lg text-sm ${hash===k?'bg-gray-800 text-white':'text-gray-400 hover:text-white'}">${v.icon} ${v.label}</a>`
-      ).join('');
+      document.getElementById('pageTitle').textContent = page.title;
+      document.getElementById('balanceDisplay').textContent = '$' + (state.user.balance || 0).toFixed(2);
+      document.getElementById('tierBadge').innerHTML = `<span class="badge badge-blue">${esc(state.user.tier)}</span>`;
+      document.getElementById('userInfo').innerHTML = `<div>${esc(state.user.email)}</div><div class="text-xs">${esc(state.user.tier)} tier</div>`;
 
-      if (route) {
-        try {
-          document.getElementById('app').innerHTML = '<div class="text-center py-20"><div class="animate-spin text-3xl">⏳</div></div>';
-          document.getElementById('app').innerHTML = await route.page();
-        } catch(e) {
-          document.getElementById('app').innerHTML = `<div class="text-center py-20 text-red-400">Error: ${e.message}</div>`;
-        }
+      document.querySelectorAll('.nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === hash);
+      });
+
+      try {
+        document.getElementById('app').innerHTML = '<div class="text-center py-20"><div class="animate-spin text-3xl">⏳</div></div>';
+        document.getElementById('app').innerHTML = await page.fn();
+      } catch(e) {
+        document.getElementById('app').innerHTML = `<div class="text-center py-20 text-red-400">Error: ${esc(e.message)}</div>`;
       }
     }
 
