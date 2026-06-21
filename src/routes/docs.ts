@@ -58,7 +58,7 @@ export function generateOpenAPISpec() {
         post: {
           summary: "Register new user",
           tags: ["Auth"],
-          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "password"], properties: { email: { type: "string" }, password: { type: "string", minLength: 6 }, name: { type: "string" } } } } } },
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "password"], properties: { email: { type: "string" }, password: { type: "string", minLength: 8 }, name: { type: "string" } } } } } },
           responses: { "201": { description: "User created with API key" }, "409": { description: "Email already registered" } },
         },
       },
@@ -66,7 +66,7 @@ export function generateOpenAPISpec() {
         post: {
           summary: "Login",
           tags: ["Auth"],
-          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email"], properties: { email: { type: "string" }, password: { type: "string" } } } } } },
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["email", "password"], properties: { email: { type: "string" }, password: { type: "string" } } } } } },
           responses: { "200": { description: "Login successful, returns JWT token" }, "401": { description: "Invalid credentials" } },
         },
       },
@@ -89,17 +89,39 @@ export function generateOpenAPISpec() {
         get: { summary: "Get usage stats", tags: ["Usage"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Usage summary" } } },
       },
       "/api/billing/topup": {
-        post: { summary: "Top up balance", tags: ["Billing"], security: [{ BearerAuth: [] }], requestBody: { content: { "application/json": { schema: { type: "object", properties: { amount: { type: "number" } } } } } }, responses: { "201": { description: "Balance topped up" } } },
+        post: { summary: "Top up balance (disabled, use Midtrans)", tags: ["Billing"], security: [{ BearerAuth: [] }], responses: { "400": { description: "Use Midtrans" } } },
       },
       "/api/billing/transactions": {
         get: { summary: "Transaction history", tags: ["Billing"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Transaction list" } } },
       },
       "/api/budget": {
         get: { summary: "Get budget settings", tags: ["Budget"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Budget info" } } },
-        put: { summary: "Update budget limits", tags: ["Budget"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Budget updated" } } },
+        put: { summary: "Update monthly budget cap", tags: ["Budget"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Budget updated" } } },
       },
       "/api/budget/alerts": {
         get: { summary: "Get spending alerts", tags: ["Budget"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Alert list" } } },
+      },
+      "/api/pricing": {
+        get: { summary: "List pricing tiers", tags: ["Pricing"], responses: { "200": { description: "Tier list" } } },
+      },
+      "/api/pricing/current": {
+        get: { summary: "Current user tier", tags: ["Pricing"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Current tier" } } },
+      },
+      "/api/pricing/upgrade": {
+        post: { summary: "Upgrade tier", tags: ["Pricing"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Upgraded" } } },
+      },
+      "/api/referral": {
+        get: { summary: "Get referral code", tags: ["Referral"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Referral info" } } },
+      },
+      "/api/referral/apply": {
+        post: { summary: "Apply referral code", tags: ["Referral"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Applied" } } },
+      },
+      "/api/byok": {
+        get: { summary: "List BYOK keys", tags: ["BYOK"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Key list" } } },
+        post: { summary: "Register BYOK key", tags: ["BYOK"], security: [{ BearerAuth: [] }], responses: { "200": { description: "Registered" } } },
+      },
+      "/api/calculate": {
+        get: { summary: "Estimate cost", tags: ["Pricing"], security: [{ BearerAuth: [] }], parameters: [{ name: "model", in: "query", required: true, schema: { type: "string" } }, { name: "input_tokens", in: "query", schema: { type: "integer" } }, { name: "output_tokens", in: "query", schema: { type: "integer" } }], responses: { "200": { description: "Cost estimate" } } },
       },
       "/api/admin/users": {
         get: { summary: "List all users", tags: ["Admin"], security: [{ BearerAuth: [] }], responses: { "200": { description: "User list" }, "403": { description: "Admin access required" } } },
@@ -125,8 +147,9 @@ export function generateOpenAPISpec() {
           properties: {
             model: { type: "string", description: "Model ID (e.g., openai/gpt-4o)" },
             messages: { type: "array", items: { type: "object", properties: { role: { type: "string", enum: ["system", "user", "assistant"] }, content: { type: "string" } } } },
-            temperature: { type: "number" },
-            max_tokens: { type: "integer" },
+            temperature: { type: "number", minimum: 0, maximum: 2 },
+            max_tokens: { type: "integer", minimum: 1, maximum: 200000 },
+            top_p: { type: "number", minimum: 0, maximum: 1 },
             stream: { type: "boolean" },
           },
         },
@@ -161,7 +184,10 @@ export function generateOpenAPISpec() {
       { name: "Usage", description: "Usage analytics" },
       { name: "Billing", description: "Balance & payments" },
       { name: "Budget", description: "Spending limits & alerts" },
-      { name: "Admin", description: "Admin panel (enterprise tier)" },
+      { name: "Pricing", description: "Tiers & upgrades" },
+      { name: "Referral", description: "Referral system" },
+      { name: "BYOK", description: "Bring Your Own Key" },
+      { name: "Admin", description: "Admin panel (is_admin flag)" },
       { name: "System", description: "Health & status" },
     ],
   };
