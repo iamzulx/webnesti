@@ -72,11 +72,20 @@
       return data;
     }
 
+    // ============ HTML ESCAPE ============
+    // Escape any value interpolated into innerHTML to prevent stored/reflected XSS
+    // (e.g. an API key name like "<img src=x onerror=...>").
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     // ============ TOAST ============
     function toast(msg, type = 'info') {
       const el = document.getElementById('toast');
       const colors = { info:'bg-sky-600', success:'bg-emerald-600', error:'bg-red-600' };
-      el.innerHTML = `<div class="${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg fade-in text-sm">${msg}</div>`;
+      el.innerHTML = `<div class="${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg fade-in text-sm">${esc(msg)}</div>`;
       el.classList.remove('hidden');
       setTimeout(() => el.classList.add('hidden'), 3000);
     }
@@ -225,8 +234,8 @@
               </tr></thead>
               <tbody>${keys.map(k => `
                 <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td class="px-4 py-3 font-mono text-sky-400">${k.key_prefix}...</td>
-                  <td class="px-4 py-3">${k.name || '-'}</td>
+                  <td class="px-4 py-3 font-mono text-sky-400">${esc(k.key_prefix)}...</td>
+                  <td class="px-4 py-3">${esc(k.name) || '-'}</td>
                   <td class="px-4 py-3 text-right">${k.rate_limit}/min</td>
                   <td class="px-4 py-3 text-center">${k.is_active ? badge('Active','green') : badge('Revoked','red')}</td>
                   <td class="px-4 py-3 text-right text-gray-500">${(k.created_at||'').slice(0,10)}</td>

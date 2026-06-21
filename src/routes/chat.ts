@@ -118,6 +118,16 @@ chat.post("/completions", async (c) => {
   }
 
   const modelId = body.model;
+
+  // Only allow models that are registered AND active in our catalog. Without this,
+  // any model string on a loaded provider (e.g. an unlisted or deactivated model)
+  // would be forwarded with no pricing row — running at $0 cost and bypassing both
+  // the balance check and billing entirely.
+  const modelRow = dbGet("SELECT * FROM models WHERE id = ? AND is_active = 1", [modelId]);
+  if (!modelRow) {
+    return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
+  }
+
   const resolved = getProviderForModel(modelId);
   if (!resolved) {
     return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
@@ -126,10 +136,8 @@ chat.post("/completions", async (c) => {
   const { provider, rawModelId } = resolved;
   const startTime = Date.now();
 
-  // Get pricing
-  const modelRow = dbGet("SELECT * FROM models WHERE id = ?", [modelId]);
-  const priceIn = modelRow?.pricing_input || 0;
-  const priceOut = modelRow?.pricing_output || 0;
+  const priceIn = modelRow.pricing_input || 0;
+  const priceOut = modelRow.pricing_output || 0;
 
   // Estimate prompt tokens from messages (rough: ~1 token per 4 chars).
   const estimatedPromptTokens = Math.ceil((validation.promptChars || 0) / 4);

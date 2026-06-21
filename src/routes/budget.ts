@@ -33,16 +33,26 @@ budget.get("/", (c) => {
 });
 
 // PUT /api/budget — update budget limits
+// NOTE: rate_limit and daily_limit are NOT user-editable here. They are governed
+// by the user's tier (see monetization upgrade). Allowing clients to set them would
+// let any user raise their own quota and defeat the per-tier rate limiter. Only the
+// self-imposed monthly_budget (a soft spend cap) can be set here.
 budget.put("/", async (c) => {
   const apiKey = c.get("apiKey");
   const body = await c.req.json().catch(() => ({}));
-  const { monthly_budget, daily_limit, rate_limit } = body;
+  const { monthly_budget } = body;
 
-  if (monthly_budget !== undefined) dbRun("UPDATE api_keys SET monthly_budget = ? WHERE id = ?", [monthly_budget, apiKey.id]);
-  if (daily_limit !== undefined) dbRun("UPDATE api_keys SET daily_limit = ? WHERE id = ?", [daily_limit, apiKey.id]);
-  if (rate_limit !== undefined) dbRun("UPDATE api_keys SET rate_limit = ? WHERE id = ?", [rate_limit, apiKey.id]);
+  if (monthly_budget !== undefined && monthly_budget !== null) {
+    if (typeof monthly_budget !== "number" || !Number.isFinite(monthly_budget) || monthly_budget < 0) {
+      return c.json({ error: "monthly_budget must be a non-negative number or null" }, 400);
+    }
+  }
 
-  return c.json({ updated: true, monthly_budget, daily_limit, rate_limit });
+  if (monthly_budget !== undefined) {
+    dbRun("UPDATE api_keys SET monthly_budget = ? WHERE id = ?", [monthly_budget, apiKey.id]);
+  }
+
+  return c.json({ updated: true, monthly_budget });
 });
 
 // GET /api/budget/alerts — get spending alerts

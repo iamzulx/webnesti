@@ -5,12 +5,15 @@ import { getProviderMap } from "../providers/index.js";
 
 const admin = new Hono();
 
-// Admin middleware — check if user is admin (tier=enterprise)
+// Admin middleware — gated on the dedicated is_admin flag, NOT on tier. The
+// enterprise tier is purchasable (and self-upgradeable), so conflating it with
+// administrative privilege let any user who reached the tier balance grant
+// themselves full platform control. is_admin must be set out-of-band (DB/ops).
 admin.use("*", authMiddleware);
 admin.use("*", async (c, next) => {
   const user = c.get("user");
-  if (user.tier !== "enterprise") {
-    return c.json({ error: "Admin access required (enterprise tier)" }, 403);
+  if (!user.is_admin) {
+    return c.json({ error: "Admin access required" }, 403);
   }
   await next();
 });
