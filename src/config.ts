@@ -36,6 +36,7 @@ export const config = {
   encryptionKey,
   corsOrigins: process.env.CORS_ORIGINS?.split(",").map(s => s.trim()) || ["https://webnesti.ai", "http://localhost:3000"],
   providers: {
+    // First-party providers
     openai: { apiKey: process.env.OPENAI_API_KEY || "" },
     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY || "" },
     google: { apiKey: process.env.GOOGLE_AI_API_KEY || "" },
@@ -43,5 +44,17 @@ export const config = {
     meta: { apiKey: process.env.META_API_KEY || process.env.TOGETHER_API_KEY || "" },
     xai: { apiKey: process.env.XAI_API_KEY || "" },
     mistral: { apiKey: process.env.MISTRAL_API_KEY || "" },
+    cohere: { apiKey: process.env.COHERE_API_KEY || "" },
+    // OpenAI-compatible providers
+    groq: { apiKey: process.env.GROQ_API_KEY || "" },
+    cerebras: { apiKey: process.env.CEREBRAS_API_KEY || "" },
+    sambanova: { apiKey: process.env.SAMBANOVA_API_KEY || "" },
+    fireworks: { apiKey: process.env.FIREWORKS_API_KEY || "" },
+    together: { apiKey: process.env.TOGETHER_API_KEY || "" },
+    perplexity: { apiKey: process.env.PERPLEXITY_API_KEY || "" },
+    moonshot: { apiKey: process.env.MOONSHOT_API_KEY || "" },
+    zai: { apiKey: process.env.ZAI_API_KEY || "" },
+    minimax: { apiKey: process.env.MINIMAX_API_KEY || "" },
+    qwen: { apiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || "" },
   },
 };
