@@ -16,6 +16,12 @@ function getBucket(keyId: string, limit: number): Bucket {
   if (!b) {
     b = { tokens: limit, lastRefill: Date.now(), limit, refillRate: limit / 60_000 }; // per minute
     buckets.set(keyId, b);
+  } else if (b.limit !== limit) {
+    // Key's rate_limit changed (e.g. tier upgrade/downgrade): refresh the bucket
+    // so the new limit takes effect instead of the value captured at creation.
+    b.limit = limit;
+    b.refillRate = limit / 60_000;
+    b.tokens = Math.min(b.tokens, limit);
   }
   return b;
 }
