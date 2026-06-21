@@ -6,6 +6,7 @@ import { join } from "path";
 import { config } from "./config.js";
 import { getDb } from "./db/index.js";
 import { initProviders } from "./providers/index.js";
+import { cleanupBuckets } from "./middleware/rateLimit.js";
 import { AppError } from "./errors.js";
 import chatRoutes from "./routes/chat.js";
 import modelsRoutes from "./routes/models.js";
@@ -113,6 +114,10 @@ app.get("/*", async (c) => {
 async function main() {
   await getDb();
   initProviders();
+
+  // Periodically evict stale rate-limit buckets so the in-memory map cannot grow
+  // unbounded (one entry per API key) and exhaust memory.
+  setInterval(() => cleanupBuckets(), 60_000).unref();
 
   serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
     console.log(`[webnesti v0.6.0] http://${config.host}:${info.port}`);
