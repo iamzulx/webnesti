@@ -7,10 +7,15 @@ import { createHash } from "crypto";
 import { config } from "../config.js";
 
 const midtrans = new Hono();
-midtrans.use("*", authMiddleware);
+
+// NOTE: auth is applied per-route, NOT globally. The /callback webhook is an
+// unauthenticated server-to-server notification from Midtrans (it cannot present
+// a user's wn_ API key); it is authenticated by the SHA-512 signature check
+// below. Gating it with authMiddleware made every notification 401, so top-ups
+// could never settle and the signature verification was unreachable.
 
 // POST /api/midtrans/create — create Snap transaction
-midtrans.post("/create", async (c) => {
+midtrans.post("/create", authMiddleware, async (c) => {
   const user = c.get("user");
   const body = await c.req.json().catch(() => ({}));
   const amount = parseFloat(body.amount || "0");

@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { join, resolve, sep } from "path";
 import { config } from "./config.js";
 import { getDb, saveDb } from "./db/index.js";
 import { initProviders } from "./providers/index.js";
@@ -97,8 +97,11 @@ app.get("/*", async (c) => {
   if (path.startsWith("/v1/") || path.startsWith("/api/")) {
     return c.json({ error: { message: "Not found", type: "not_found" } }, 404);
   }
-  const filePath = join(PUBLIC_DIR, path === "/" ? "index.html" : path);
-  if (existsSync(filePath) && !filePath.endsWith("/")) {
+  const filePath = resolve(PUBLIC_DIR, "." + (path === "/" ? "/index.html" : path));
+  // Defense-in-depth against path traversal: never serve outside PUBLIC_DIR even
+  // if a crafted/encoded path slips past URL normalization.
+  const withinPublic = filePath === PUBLIC_DIR || filePath.startsWith(PUBLIC_DIR + sep);
+  if (withinPublic && existsSync(filePath) && !filePath.endsWith(sep)) {
     try {
       const content = await readFile(filePath);
       const ext = filePath.slice(filePath.lastIndexOf("."));
