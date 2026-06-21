@@ -144,7 +144,13 @@ export function initProviders() {
 
 export function getProviderForModel(modelId: string): { provider: Provider; rawModelId: string } | undefined {
   if (modelId.includes("/")) {
-    const [pid, mid] = modelId.split("/", 2);
+    // Split on the FIRST slash only. Some provider model IDs contain slashes
+    // themselves (e.g. Fireworks "accounts/fireworks/models/..." or Together
+    // "meta-llama/Llama-3.3-70B-..."); split("/", 2) would truncate those and
+    // forward a broken model name upstream.
+    const slash = modelId.indexOf("/");
+    const pid = modelId.slice(0, slash);
+    const mid = modelId.slice(slash + 1);
     const p = providers.get(pid);
     return p ? { provider: p, rawModelId: mid } : undefined;
   }

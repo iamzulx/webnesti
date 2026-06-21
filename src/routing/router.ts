@@ -45,7 +45,11 @@ export function resolveModel(
 ): RouteResult | undefined {
   // 1. Try "provider/model" format
   if (modelId.includes("/")) {
-    const [pid, mid] = modelId.split("/", 2);
+    // Split on the FIRST slash only — provider model IDs may contain slashes
+    // (e.g. "accounts/fireworks/models/...", "meta-llama/Llama-3.3-70B-...").
+    const slash = modelId.indexOf("/");
+    const pid = modelId.slice(0, slash);
+    const mid = modelId.slice(slash + 1);
     const provider = providers.get(pid);
     if (provider) {
       const chain = getFallbackChain(pid);
