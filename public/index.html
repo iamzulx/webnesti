@@ -1,707 +1,1677 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebNesti — AI Model API</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: { extend: { colors: { nest: { 50:'#f0f9ff',100:'#e0f2fe',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' } } } }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebNesti — AI Model API Provider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+      colors: {
+        accent: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' }
+      }
     }
-  </script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    * { box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; margin: 0; }
-    .fade-in { animation: fadeIn 0.2s ease-out; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
-    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; transition: all 0.15s; cursor: pointer; }
-    .card:hover { border-color: #374151; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .btn { padding: 8px 16px; border-radius: 8px; font-weight: 500; font-size: 14px; cursor: pointer; transition: all 0.15s; border: none; }
-    .btn-primary { background: #0284c7; color: white; }
-    .btn-primary:hover { background: #0369a1; }
-    .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
-    .btn-ghost:hover { background: #1e293b; color: white; }
-    .btn-success { background: #059669; color: white; }
-    .btn-danger { background: #dc2626; color: white; }
-    .input { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; color: white; width: 100%; font-size: 14px; }
-    .input:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,0.2); }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-green { background: #064e3b; color: #6ee7b7; }
-    .badge-blue { background: #0c4a6e; color: #7dd3fc; }
-    .badge-purple { background: #4c1d95; color: #c4b5fd; }
-    .badge-amber { background: #78350f; color: #fcd34d; }
-    .badge-red { background: #7f1d1d; color: #fca5a5; }
-    .badge-gray { background: #1e293b; color: #94a3b8; }
-    .sidebar { width: 240px; background: #0f172a; border-right: 1px solid #1e293b; min-height: 100vh; position: fixed; left: 0; top: 0; z-index: 40; }
-    .main { margin-left: 240px; min-height: 100vh; }
-    .nav-item { padding: 10px 16px; border-radius: 8px; color: #94a3b8; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; gap: 10px; font-size: 14px; }
-    .nav-item:hover { background: #1e293b; color: white; }
-    .nav-item.active { background: #0c4a6e; color: white; }
-    .stat-card { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1px solid #334155; border-radius: 12px; padding: 20px; }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; display: flex; align-items: center; justify-content: center; }
-    .modal { background: #111827; border: 1px solid #334155; border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; }
-    .toast { position: fixed; bottom: 20px; right: 20px; z-index: 100; padding: 12px 20px; border-radius: 8px; font-size: 14px; animation: slideUp 0.3s ease-out; }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .chat-msg { padding: 12px 16px; border-radius: 12px; margin-bottom: 8px; max-width: 80%; }
-    .chat-user { background: #0284c7; color: white; margin-left: auto; }
-    .chat-ai { background: #1e293b; color: #e2e8f0; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    @media (max-width: 768px) {
-      .sidebar { display: none; }
-      .main { margin-left: 0; }
-    }
-  </style>
+  }
+}
+</script>
+<style>
+*{scrollbar-width:thin;scrollbar-color:#1f2937 transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#1f2937;border-radius:3px}
+body{font-family:'Inter',system-ui,sans-serif;background:#030712;color:#e5e7eb;overflow-x:hidden}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 20px rgba(14,165,233,0.15)}50%{box-shadow:0 0 40px rgba(14,165,233,0.3)}}
+@keyframes gradient-shift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes typing{from{width:0}to{width:100%}}
+@keyframes blink{50%{border-color:transparent}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.animate-fade-in{animation:fadeIn .4s ease-out forwards}
+.animate-slide-in{animation:slideIn .3s ease-out forwards}
+.animate-pulse-glow{animation:pulse-glow 3s ease-in-out infinite}
+.animate-float{animation:float 6s ease-in-out infinite}
+.gradient-animated{background:linear-gradient(-45deg,#0ea5e9,#8b5cf6,#06b6d4,#3b82f6);background-size:400% 400%;animation:gradient-shift 8s ease infinite}
+.shimmer{background:linear-gradient(90deg,transparent 0%,rgba(14,165,233,0.08) 50%,transparent 100%);background-size:200% 100%;animation:shimmer 2s infinite}
+.page{display:none;opacity:0}.page.active{display:block;animation:fadeIn .4s ease-out forwards}
+.sidebar-link{transition:all .2s ease}.sidebar-link:hover,.sidebar-link.active{background:rgba(14,165,233,0.1);color:#0ea5e9}
+.sidebar-link.active{border-right:3px solid #0ea5e9}
+.card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;transition:all .2s ease}
+.card:hover{border-color:#0ea5e9;box-shadow:0 0 20px rgba(14,165,233,0.08)}
+.btn-primary{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border-radius:10px;padding:10px 24px;font-weight:600;transition:all .2s ease;border:none;cursor:pointer}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(14,165,233,0.3)}
+.btn-primary:active{transform:translateY(0)}
+.btn-secondary{background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:10px;padding:10px 24px;font-weight:500;transition:all .2s ease;cursor:pointer}
+.btn-secondary:hover{background:#374151;border-color:#4b5563}
+.btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border-radius:10px;padding:10px 24px;font-weight:600;transition:all .2s ease;border:none;cursor:pointer}
+.btn-danger:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(239,68,68,0.3)}
+input,textarea,select{background:#0f172a;border:1px solid #1f2937;color:#e5e7eb;border-radius:10px;padding:10px 14px;font-size:14px;transition:border-color .2s;outline:none;width:100%}
+input:focus,textarea:focus,select:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,0.1)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:12px 16px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;border-bottom:1px solid #1f2937}
+td{padding:12px 16px;border-bottom:1px solid #1f2937;font-size:14px}
+tr:hover td{background:rgba(14,165,233,0.03)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal-content{background:#0f172a;border:1px solid #1f2937;border-radius:16px;padding:32px;max-width:520px;width:90%;transform:scale(0.95);transition:transform .25s}
+.modal-overlay.show .modal-content{transform:scale(1)}
+.toast-container{position:fixed;top:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;animation:slideIn .3s ease-out;min-width:280px;display:flex;align-items:center;gap:10px;backdrop-filter:blur(8px)}
+.toast-success{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80}
+.toast-error{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171}
+.toast-info{background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.3);color:#38bdf8}
+.provider-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;text-transform:uppercase}
+.chat-bubble{max-width:80%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.6}
+.chat-bubble-user{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;margin-left:auto;border-bottom-right-radius:4px}
+.chat-bubble-assistant{background:#1e293b;color:#e5e7eb;border-bottom-left-radius:4px}
+.stat-card{background:linear-gradient(135deg,rgba(15,23,42,0.9),rgba(15,23,42,0.7));border:1px solid #1f2937;border-radius:12px;padding:24px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#0ea5e9,#8b5cf6)}
+.landing-gradient{background:radial-gradient(ellipse at 30% 20%,rgba(14,165,233,0.12) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(139,92,246,0.08) 0%,transparent 50%),#030712}
+.hero-glow{position:absolute;width:600px;height:600px;border-radius:50%;filter:blur(120px);opacity:0.15;pointer-events:none}
+.code-block{background:#0a0f1a;border:1px solid #1f2937;border-radius:10px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#94a3b8;overflow-x:auto;white-space:pre}
+.method-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;font-family:monospace;letter-spacing:.05em}
+.method-get{background:rgba(34,197,94,0.15);color:#4ade80}
+.method-post{background:rgba(59,130,246,0.15);color:#60a5fa}
+.method-put{background:rgba(245,158,11,0.15);color:#fbbf24}
+.method-delete{background:rgba(239,68,68,0.15);color:#f87171}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);position:fixed;z-index:50;transition:transform .3s ease}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-left:0!important}
+  .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:40}
+  .mobile-overlay.show{display:block}
+}
+@media(min-width:769px){
+  .mobile-overlay{display:none!important}
+}
+</style>
 </head>
-<body class="dark bg-gray-950 text-gray-100">
+<body>
+<!-- Toast Container -->
+<div id="toastContainer" class="toast-container"></div>
 
-  <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
-    <div class="p-4 border-b border-gray-800">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold">W</div>
-        <div>
-          <div class="font-bold text-white text-sm">WebNesti</div>
-          <div class="text-xs text-gray-500">AI Model API</div>
+<!-- Mobile Overlay -->
+<div id="mobileOverlay" class="mobile-overlay" onclick="toggleSidebar()"></div>
+
+<!-- Modal -->
+<div id="modalOverlay" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
+<!-- ====== LANDING PAGE (Non-authenticated) ====== -->
+<div id="landingPage" class="landing-gradient min-h-screen">
+  <!-- Landing Nav -->
+  <nav class="fixed top-0 w-full z-50 backdrop-blur-xl bg-gray-950/70 border-b border-gray-800/50">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg gradient-animated flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <span class="text-xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">WebNesti</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="showPage('login')" class="btn-secondary text-sm">Sign In</button>
+        <button onclick="showPage('register')" class="btn-primary text-sm">Get Started</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="pt-32 pb-20 px-6 relative overflow-hidden">
+    <div class="hero-glow bg-sky-500 -top-40 -left-40" style="left:-100px;top:-100px"></div>
+    <div class="hero-glow bg-purple-500" style="right:-100px;bottom:-100px"></div>
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-sm mb-8">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/></svg>
+        Unified AI API — One endpoint, all models
+      </div>
+      <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">
+        <span class="bg-gradient-to-r from-white via-sky-100 to-sky-200 bg-clip-text text-transparent">Access Every</span><br>
+        <span class="bg-gradient-to-r from-sky-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">AI Model</span>
+        <span class="bg-gradient-to-r from-white via-sky-100 to-sky-200 bg-clip-text text-transparent"> via One API</span>
+      </h1>
+      <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+        WebNesti unifies 18+ AI providers and 47+ models behind a single OpenAI-compatible endpoint. 
+        Switch models without changing code. Pay only for what you use.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <button onclick="showPage('register')" class="btn-primary text-base px-8 py-4 flex items-center justify-center gap-2">
+          Start Building for Free
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+        </button>
+        <button onclick="scrollToSection('landing-docs')" class="btn-secondary text-base px-8 py-4 flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          View API Docs
+        </button>
+      </div>
+      <!-- Code snippet preview -->
+      <div class="mt-16 max-w-2xl mx-auto text-left">
+        <div class="code-block"><span class="text-sky-400">curl</span> https://api.webnesti.com/v1/chat/completions \
+  -H <span class="text-green-400">"Authorization: Bearer YOUR_KEY"</span> \
+  -H <span class="text-green-400">"Content-Type: application/json"</span> \
+  -d <span class="text-green-400">'{"model":"gpt-4o","messages":[{"role":"user","content":"Hello!"}]}'</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <section class="py-12 border-y border-gray-800/50">
+    <div class="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <div><div class="text-3xl font-bold text-white">18+</div><div class="text-sm text-gray-500 mt-1">AI Providers</div></div>
+      <div><div class="text-3xl font-bold text-white">47+</div><div class="text-sm text-gray-500 mt-1">Models Available</div></div>
+      <div><div class="text-3xl font-bold text-white">99.9%</div><div class="text-sm text-gray-500 mt-1">Uptime SLA</div></div>
+      <div><div class="text-3xl font-bold text-white">&lt;100ms</div><div class="text-sm text-gray-500 mt-1">Avg Latency</div></div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section class="py-24 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Everything you need to build AI apps</h2>
+        <p class="text-gray-400 max-w-2xl mx-auto">A complete toolkit for integrating AI into your products, with enterprise-grade reliability.</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">OpenAI Compatible</h3>
+          <p class="text-gray-400 text-sm">Drop-in replacement. Same request/response format. Works with any OpenAI SDK.</p>
+        </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">18+ Providers</h3>
+          <p class="text-gray-400 text-sm">OpenAI, Anthropic, Google, Mistral, Cohere, Meta, and more. All accessible via one API.</p>
+        </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">Pay-Per-Use</h3>
+          <p class="text-gray-400 text-sm">No subscriptions. No minimums. Only pay for the tokens you actually consume.</p>
+        </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">Streaming Support</h3>
+          <p class="text-gray-400 text-sm">Real-time token streaming for responsive UIs. Server-sent events compatible.</p>
+        </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-rose-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">Secure API Keys</h3>
+          <p class="text-gray-400 text-sm">Create and manage multiple API keys with per-key rate limits and instant revocation.</p>
+        </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-4"><svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+          <h3 class="text-white font-semibold mb-2">Usage Analytics</h3>
+          <p class="text-gray-400 text-sm">Detailed dashboards with request logs, token counts, costs, and performance metrics.</p>
         </div>
       </div>
     </div>
-    <div class="p-3 space-y-1" id="navItems">
-      <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">📊 Dashboard</div>
-      <div class="nav-item" data-page="playground" onclick="navigate('playground')">🧪 Playground</div>
-      <div class="nav-item" data-page="models" onclick="navigate('models')">🤖 Models</div>
-      <div class="nav-item" data-page="keys" onclick="navigate('keys')">🔑 API Keys</div>
-      <div class="nav-item" data-page="usage" onclick="navigate('usage')">📈 Usage</div>
-      <div class="nav-item" data-page="billing" onclick="navigate('billing')">💳 Billing</div>
-      <div class="nav-item" data-page="pricing" onclick="navigate('pricing')">💰 Pricing</div>
-      <div class="nav-item" data-page="referral" onclick="navigate('referral')">🎁 Referral</div>
-      <div class="nav-item" data-page="docs" onclick="navigate('docs')">📖 API Docs</div>
-      <div class="nav-item" data-page="settings" onclick="navigate('settings')">⚙️ Settings</div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="py-24 px-6 border-t border-gray-800/50">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-bold text-white text-center mb-16">Start in 3 simple steps</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="text-center">
+          <div class="w-14 h-14 rounded-full gradient-animated flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">1</div>
+          <h3 class="text-white font-semibold text-lg mb-2">Create an Account</h3>
+          <p class="text-gray-400 text-sm">Sign up for free in seconds. No credit card required to start.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-14 h-14 rounded-full gradient-animated flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">2</div>
+          <h3 class="text-white font-semibold text-lg mb-2">Get Your API Key</h3>
+          <p class="text-gray-400 text-sm">Generate an API key from your dashboard. One key for all models.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-14 h-14 rounded-full gradient-animated flex items-center justify-center text-white text-xl font-bold mx-auto mb-6">3</div>
+          <h3 class="text-white font-semibold text-lg mb-2">Make Your First Call</h3>
+          <p class="text-gray-400 text-sm">Use our OpenAI-compatible endpoint. Same SDK, same format, more models.</p>
+        </div>
+      </div>
     </div>
-    <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-800">
-      <div id="userInfo" class="text-sm text-gray-400"></div>
-      <button onclick="logout()" class="btn btn-ghost w-full mt-2 text-sm">Logout</button>
+  </section>
+
+  <!-- Pricing Preview -->
+  <section class="py-24 px-6 border-t border-gray-800/50">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-bold text-white text-center mb-4">Simple, transparent pricing</h2>
+      <p class="text-gray-400 text-center mb-16">Start free. Scale as you grow. No hidden fees.</p>
+      <div class="grid md:grid-cols-4 gap-6">
+        <div class="card p-6 text-center">
+          <div class="text-gray-400 text-sm font-semibold mb-2">FREE</div>
+          <div class="text-3xl font-bold text-white mb-1">$0</div>
+          <div class="text-gray-500 text-sm mb-6">forever</div>
+          <ul class="text-sm text-gray-400 space-y-3 text-left mb-6">
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>$1 free credits</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>5 API keys</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>60 RPM rate limit</li>
+          </ul>
+          <button onclick="showPage('register')" class="btn-secondary w-full">Get Started</button>
+        </div>
+        <div class="card p-6 text-center">
+          <div class="text-gray-400 text-sm font-semibold mb-2">STARTER</div>
+          <div class="text-3xl font-bold text-white mb-1">$9</div>
+          <div class="text-gray-500 text-sm mb-6">/month</div>
+          <ul class="text-sm text-gray-400 space-y-3 text-left mb-6">
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>$10 credits/mo</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>15 API keys</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>300 RPM rate limit</li>
+          </ul>
+          <button onclick="showPage('register')" class="btn-secondary w-full">Choose Starter</button>
+        </div>
+        <div class="p-6 text-center rounded-2xl border-2 border-sky-500 relative" style="background:linear-gradient(180deg,rgba(14,165,233,0.08),#0f172a)">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-sky-500 text-white text-xs font-bold rounded-full">POPULAR</div>
+          <div class="text-sky-400 text-sm font-semibold mb-2">PRO</div>
+          <div class="text-3xl font-bold text-white mb-1">$29</div>
+          <div class="text-gray-500 text-sm mb-6">/month</div>
+          <ul class="text-sm text-gray-400 space-y-3 text-left mb-6">
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>$50 credits/mo</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>50 API keys</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>1000 RPM rate limit</li>
+          </ul>
+          <button onclick="showPage('register')" class="btn-primary w-full">Choose Pro</button>
+        </div>
+        <div class="card p-6 text-center">
+          <div class="text-gray-400 text-sm font-semibold mb-2">ENTERPRISE</div>
+          <div class="text-3xl font-bold text-white mb-1">Custom</div>
+          <div class="text-gray-500 text-sm mb-6">contact us</div>
+          <ul class="text-sm text-gray-400 space-y-3 text-left mb-6">
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Custom credits</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Unlimited keys</li>
+            <li class="flex items-center gap-2"><svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Unlimited RPM</li>
+          </ul>
+          <button class="btn-secondary w-full">Contact Sales</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-24 px-6">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Ready to build with AI?</h2>
+      <p class="text-gray-400 mb-8">Join thousands of developers using WebNesti to power their AI applications.</p>
+      <button onclick="showPage('register')" class="btn-primary text-lg px-10 py-4">Create Free Account</button>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800/50 py-12 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid md:grid-cols-4 gap-8 mb-12">
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-7 h-7 rounded-lg gradient-animated flex items-center justify-center">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <span class="font-bold text-white">WebNesti</span>
+          </div>
+          <p class="text-sm text-gray-500">Unified AI API platform for developers.</p>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4 text-sm">Product</h4>
+          <ul class="text-sm text-gray-400 space-y-2">
+            <li><a href="#models" class="hover:text-sky-400 transition">Models</a></li>
+            <li><a href="#pricing" class="hover:text-sky-400 transition">Pricing</a></li>
+            <li><a href="#docs" class="hover:text-sky-400 transition">API Docs</a></li>
+            <li><a href="#playground" class="hover:text-sky-400 transition">Playground</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4 text-sm">Company</h4>
+          <ul class="text-sm text-gray-400 space-y-2">
+            <li><a href="#" class="hover:text-sky-400 transition">About</a></li>
+            <li><a href="#" class="hover:text-sky-400 transition">Blog</a></li>
+            <li><a href="#" class="hover:text-sky-400 transition">Careers</a></li>
+            <li><a href="#" class="hover:text-sky-400 transition">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-white font-semibold mb-4 text-sm">Legal</h4>
+          <ul class="text-sm text-gray-400 space-y-2">
+            <li><a href="#" class="hover:text-sky-400 transition">Privacy</a></li>
+            <li><a href="#" class="hover:text-sky-400 transition">Terms</a></li>
+            <li><a href="#" class="hover:text-sky-400 transition">Security</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-gray-800/50 pt-8 text-center text-sm text-gray-600">
+        &copy; 2026 WebNesti. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- ====== AUTH PAGES ====== -->
+<div id="authPage" class="min-h-screen flex items-center justify-center landing-gradient px-6" style="display:none">
+  <div class="w-full max-w-md">
+    <!-- Login Form -->
+    <div id="loginForm" class="card p-8">
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 rounded-xl gradient-animated flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-white">Welcome back</h1>
+        <p class="text-gray-400 text-sm mt-1">Sign in to your WebNesti account</p>
+      </div>
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" required>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-primary w-full py-3" id="loginBtn">Sign In</button>
+      </form>
+      <p class="text-center text-sm text-gray-400 mt-6">
+        Don't have an account? <button onclick="toggleAuthForm('register')" class="text-sky-400 hover:underline">Create one</button>
+      </p>
+    </div>
+    <!-- Register Form -->
+    <div id="registerForm" class="card p-8" style="display:none">
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 rounded-xl gradient-animated flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold text-white">Create your account</h1>
+        <p class="text-gray-400 text-sm mt-1">Start building with AI in minutes</p>
+      </div>
+      <form onsubmit="handleRegister(event)" class="space-y-4">
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Name</label>
+          <input type="text" id="regName" placeholder="John Doe" required>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Email</label>
+          <input type="email" id="regEmail" placeholder="you@example.com" required>
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Password</label>
+          <input type="password" id="regPassword" placeholder="Min 8 characters" required minlength="8">
+        </div>
+        <div>
+          <label class="text-sm text-gray-400 mb-1 block">Referral Code <span class="text-gray-600">(optional)</span></label>
+          <input type="text" id="regReferral" placeholder="WEBNESI-XXXX">
+        </div>
+        <button type="submit" class="btn-primary w-full py-3" id="regBtn">Create Account</button>
+      </form>
+      <p class="text-center text-sm text-gray-400 mt-6">
+        Already have an account? <button onclick="toggleAuthForm('login')" class="text-sky-400 hover:underline">Sign in</button>
+      </p>
     </div>
   </div>
+</div>
+
+<!-- ====== APP LAYOUT (Authenticated) ====== -->
+<div id="appLayout" style="display:none">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar fixed left-0 top-0 bottom-0 w-60 bg-gray-950 border-r border-gray-800/80 flex flex-col z-50">
+    <div class="h-16 flex items-center gap-3 px-5 border-b border-gray-800/80 flex-shrink-0">
+      <div class="w-8 h-8 rounded-lg gradient-animated flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <span class="text-lg font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">WebNesti</span>
+    </div>
+    <nav class="flex-1 py-4 px-3 overflow-y-auto space-y-1">
+      <a onclick="navigate('dashboard')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="dashboard">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </a>
+      <a onclick="navigate('playground')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="playground">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Playground
+      </a>
+      <a onclick="navigate('models')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="models">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        Models
+      </a>
+      <a onclick="navigate('keys')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="keys">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+        API Keys
+      </a>
+      <a onclick="navigate('usage')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="usage">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Usage
+      </a>
+      <a onclick="navigate('billing')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="billing">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        Billing
+      </a>
+      <a onclick="navigate('pricing')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="pricing">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        Pricing
+      </a>
+      <a onclick="navigate('referral')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="referral">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        Referral
+      </a>
+      <div class="pt-2 mt-2 border-t border-gray-800/50">
+        <a onclick="navigate('docs')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="docs">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+          API Docs
+        </a>
+        <a onclick="navigate('settings')" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-pointer" data-page="settings">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Settings
+        </a>
+      </div>
+    </nav>
+    <div class="border-t border-gray-800/80 p-4 flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 text-sm font-semibold" id="userAvatar">U</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-white truncate" id="userName">User</div>
+          <div class="text-xs text-gray-500 truncate" id="userEmail">user@email.com</div>
+        </div>
+        <button onclick="handleLogout()" class="text-gray-500 hover:text-gray-300 transition" title="Sign out">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
 
   <!-- Main Content -->
-  <div class="main">
+  <div class="main-content ml-60 min-h-screen">
     <!-- Top Bar -->
-    <div class="sticky top-0 z-30 bg-gray-950/80 backdrop-blur border-b border-gray-800 px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <button class="md:hidden text-gray-400" onclick="toggleSidebar()">☰</button>
-        <h1 id="pageTitle" class="text-lg font-semibold">Dashboard</h1>
+    <header class="h-16 border-b border-gray-800/80 flex items-center px-6 sticky top-0 bg-gray-950/80 backdrop-blur-xl z-30">
+      <button onclick="toggleSidebar()" class="md:hidden mr-4 text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1 class="text-lg font-semibold text-white" id="pageTitle">Dashboard</h1>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="text-sm text-gray-400">Balance:</span>
+        <span class="text-sm font-semibold text-sky-400" id="topBarBalance">$0.00</span>
       </div>
-      <div class="flex items-center gap-4">
-        <div id="balanceDisplay" class="text-sm text-gray-400"></div>
-        <div id="tierBadge"></div>
-      </div>
-    </div>
+    </header>
 
-    <!-- Page Content -->
-    <div id="app" class="p-6 fade-in"></div>
-  </div>
+    <!-- Page Content Area -->
+    <main class="p-6" id="mainContent">
 
-  <!-- Toast -->
-  <div id="toast" class="toast hidden"></div>
-
-  <!-- Modal -->
-  <div id="modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
-    <div class="modal" id="modalContent"></div>
-  </div>
-
-  <script>
-    // ============ STATE ============
-    const state = { user: null, token: null, models: [], providers: {} };
-
-    // ============ API ============
-    async function api(path, opts = {}) {
-      const headers = { 'Content-Type': 'application/json' };
-      if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
-      const res = await fetch(path, { ...opts, headers: { ...headers, ...opts.headers } });
-      if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error?.message || data.error || 'Request failed');
-      return data;
-    }
-
-    // ============ UTILS ============
-    function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-    function toast(msg, type = 'info') {
-      const colors = { info: 'bg-sky-600', success: 'bg-emerald-600', error: 'bg-red-600' };
-      const el = document.getElementById('toast');
-      el.innerHTML = `<div class="${colors[type]} text-white">${esc(msg)}</div>`;
-      el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 3000);
-    }
-    function showModal(html) { document.getElementById('modalContent').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
-    function closeModal() { document.getElementById('modal').classList.add('hidden'); }
-    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
-
-    // ============ AUTH ============
-    async function login(email, password) {
-      try {
-        const data = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-        state.user = data.user; state.token = data.token;
-        localStorage.setItem('webnesti_user', JSON.stringify(data.user));
-        localStorage.setItem('webnesti_token', data.token);
-        renderApp();
-        toast('Logged in!', 'success');
-      } catch(e) { toast(e.message, 'error'); }
-    }
-
-    async function register(email, password, name) {
-      try {
-        const data = await api('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
-        showModal(`<h2 class="text-xl font-bold mb-4">Account Created!</h2>
-          <p class="text-gray-400 mb-2">Your API key (save it now):</p>
-          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-emerald-400 break-all mb-4">${esc(data.api_key)}</div>
-          <button onclick="closeModal(); login('${esc(email)}', '${esc(password)}')" class="btn btn-primary w-full">Continue to Dashboard</button>`);
-      } catch(e) { toast(e.message, 'error'); }
-    }
-
-    function logout() {
-      state.user = null; state.token = null;
-      localStorage.removeItem('webnesti_user'); localStorage.removeItem('webnesti_token');
-      renderApp();
-    }
-    function checkAuth() {
-      const u = localStorage.getItem('webnesti_user'), t = localStorage.getItem('webnesti_token');
-      if (u && t) { state.user = JSON.parse(u); state.token = t; }
-    }
-
-    // ============ PROVIDER ICONS ============
-    const ICONS = { openai:'🟢',anthropic:'🟠',google:'🔵',deepseek:'🟣',meta:'🦙',xai:'✖️',mistral:'🌊',cohere:'🔷',groq:'⚡',cerebras:'🧠',sambanova:'🟤',fireworks:'🔥',together:'🤝',perplexity:'🔍',moonshot:'🌙',zai:'🇨🇳',minimax:'🎯',qwen:'🏮' };
-
-    // ============ PAGES ============
-
-    // --- Auth Page ---
-    function authPage() {
-      return `<div class="min-h-screen flex items-center justify-center">
-        <div class="w-full max-w-sm">
-          <div class="text-center mb-8">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-sky-600 flex items-center justify-center text-3xl">⚡</div>
-            <h1 class="text-3xl font-bold text-white">WebNesti</h1>
-            <p class="text-gray-400 mt-1">AI Model API Provider</p>
+      <!-- ===== DASHBOARD PAGE ===== -->
+      <div id="page-dashboard" class="page">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-gray-400 text-sm">Balance</span>
+              <div class="w-9 h-9 rounded-lg bg-sky-500/10 flex items-center justify-center"><svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg></div>
+            </div>
+            <div class="text-2xl font-bold text-white" id="dashBalance">$0.00</div>
+            <div class="text-xs text-gray-500 mt-1">Available credits</div>
+          </div>
+          <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-gray-400 text-sm">Requests</span>
+              <div class="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center"><svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg></div>
+            </div>
+            <div class="text-2xl font-bold text-white" id="dashRequests">0</div>
+            <div class="text-xs text-gray-500 mt-1">Total API calls</div>
+          </div>
+          <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-gray-400 text-sm">Tokens Used</span>
+              <div class="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg></div>
+            </div>
+            <div class="text-2xl font-bold text-white" id="dashTokens">0</div>
+            <div class="text-xs text-gray-500 mt-1">Tokens consumed</div>
+          </div>
+          <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-gray-400 text-sm">Avg Latency</span>
+              <div class="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center"><svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+            </div>
+            <div class="text-2xl font-bold text-white" id="dashLatency">0ms</div>
+            <div class="text-xs text-gray-500 mt-1">Response time</div>
+          </div>
+        </div>
+        <div class="grid lg:grid-cols-3 gap-6 mb-6">
+          <div class="card p-6 lg:col-span-2">
+            <h3 class="text-white font-semibold mb-4">Usage Over Time</h3>
+            <div style="height:280px"><canvas id="dashChart"></canvas></div>
           </div>
           <div class="card p-6">
-            <div class="flex mb-6 bg-gray-800 rounded-lg p-1">
-              <button onclick="showAuth('login')" id="tab-login" class="flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white">Sign In</button>
-              <button onclick="showAuth('register')" id="tab-register" class="flex-1 py-2 text-sm font-medium rounded-md text-gray-400">Sign Up</button>
+            <h3 class="text-white font-semibold mb-4">Quick Actions</h3>
+            <div class="space-y-3">
+              <button onclick="navigate('playground')" class="btn-secondary w-full text-left flex items-center gap-3"><svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3"/></svg>Open Playground</button>
+              <button onclick="navigate('keys');setTimeout(()=>openCreateKeyModal(),300)" class="btn-secondary w-full text-left flex items-center gap-3"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>Create API Key</button>
+              <button onclick="navigate('models')" class="btn-secondary w-full text-left flex items-center gap-3"><svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Browse Models</button>
+              <button onclick="navigate('docs')" class="btn-secondary w-full text-left flex items-center gap-3"><svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>API Docs</button>
             </div>
-            <div id="auth-login">
-              <form onsubmit="event.preventDefault(); login(document.getElementById('login-email').value, document.getElementById('login-pass').value)">
-                <label class="block text-sm text-gray-400 mb-1">Email</label>
-                <input id="login-email" type="email" class="input mb-3" placeholder="you@example.com" required>
-                <label class="block text-sm text-gray-400 mb-1">Password</label>
-                <input id="login-pass" type="password" class="input mb-4" placeholder="••••••••" required>
-                <button type="submit" class="btn btn-primary w-full py-3">Sign In</button>
+            <h3 class="text-white font-semibold mb-3 mt-6">Provider Status</h3>
+            <div class="space-y-2" id="providerStatus">
+              <div class="flex items-center justify-between text-sm"><span class="text-gray-400">OpenAI</span><span class="flex items-center gap-1.5 text-green-400"><span class="w-2 h-2 rounded-full bg-green-400"></span>Operational</span></div>
+              <div class="flex items-center justify-between text-sm"><span class="text-gray-400">Anthropic</span><span class="flex items-center gap-1.5 text-green-400"><span class="w-2 h-2 rounded-full bg-green-400"></span>Operational</span></div>
+              <div class="flex items-center justify-between text-sm"><span class="text-gray-400">Google</span><span class="flex items-center gap-1.5 text-green-400"><span class="w-2 h-2 rounded-full bg-green-400"></span>Operational</span></div>
+              <div class="flex items-center justify-between text-sm"><span class="text-gray-400">Mistral</span><span class="flex items-center gap-1.5 text-green-400"><span class="w-2 h-2 rounded-full bg-green-400"></span>Operational</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card p-6">
+          <h3 class="text-white font-semibold mb-4">Recent Activity</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Time</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th></tr></thead>
+              <tbody id="dashActivity"><tr><td colspan="6" class="text-center text-gray-500 py-8">No activity yet. Make your first API call!</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PLAYGROUND PAGE ===== -->
+      <div id="page-playground" class="page">
+        <div class="grid lg:grid-cols-4 gap-6">
+          <div class="lg:col-span-1 space-y-4">
+            <div class="card p-5">
+              <h3 class="text-white font-semibold mb-4 text-sm">Configuration</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">Model</label>
+                  <select id="pgModel" onchange="updatePlaygroundCost()">
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                    <option value="claude-3-haiku">Claude 3 Haiku</option>
+                    <option value="gemini-pro">Gemini Pro</option>
+                    <option value="mistral-large">Mistral Large</option>
+                    <option value="llama-3.1-70b">Llama 3.1 70B</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">Temperature: <span id="pgTempVal">0.7</span></label>
+                  <input type="range" id="pgTemp" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('pgTempVal').textContent=this.value" class="w-full accent-sky-500">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">Max Tokens: <span id="pgMaxVal">1024</span></label>
+                  <input type="range" id="pgMaxTokens" min="64" max="4096" step="64" value="1024" oninput="document.getElementById('pgMaxVal').textContent=this.value" class="w-full accent-sky-500">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">System Prompt</label>
+                  <textarea id="pgSystem" rows="3" placeholder="You are a helpful assistant..." class="text-sm"></textarea>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="pgStream" checked class="accent-sky-500">
+                  <label for="pgStream" class="text-xs text-gray-400">Enable streaming</label>
+                </div>
+              </div>
+            </div>
+            <div class="card p-5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">Est. Cost</span>
+                <span class="text-sm font-semibold text-sky-400" id="pgCost">$0.0000</span>
+              </div>
+            </div>
+            <button onclick="clearPlayground()" class="btn-secondary w-full text-sm">Clear Chat</button>
+          </div>
+          <div class="lg:col-span-3 card flex flex-col" style="height:calc(100vh - 140px)">
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chatMessages">
+              <div class="text-center text-gray-500 py-20">
+                <svg class="w-12 h-12 text-gray-700 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <p class="text-sm">Send a message to start chatting</p>
+              </div>
+            </div>
+            <div class="border-t border-gray-800 p-4">
+              <form onsubmit="sendPlaygroundMessage(event)" class="flex gap-3">
+                <input type="text" id="pgInput" placeholder="Type your message..." class="flex-1" autocomplete="off">
+                <button type="submit" class="btn-primary px-6" id="pgSendBtn">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
               </form>
             </div>
-            <div id="auth-register" class="hidden">
-              <form onsubmit="event.preventDefault(); register(document.getElementById('reg-email').value, document.getElementById('reg-pass').value, document.getElementById('reg-name').value)">
-                <label class="block text-sm text-gray-400 mb-1">Name</label>
-                <input id="reg-name" type="text" class="input mb-3" placeholder="Your name">
-                <label class="block text-sm text-gray-400 mb-1">Email</label>
-                <input id="reg-email" type="email" class="input mb-3" placeholder="you@example.com" required>
-                <label class="block text-sm text-gray-400 mb-1">Password (min 8 chars)</label>
-                <input id="reg-pass" type="password" class="input mb-4" placeholder="••••••••" required minlength="8">
-                <button type="submit" class="btn btn-success w-full py-3">Create Account</button>
-              </form>
-            </div>
           </div>
         </div>
-      </div>`;
-    }
-    function showAuth(tab) {
-      document.getElementById('auth-login').classList.toggle('hidden', tab !== 'login');
-      document.getElementById('auth-register').classList.toggle('hidden', tab !== 'register');
-      document.getElementById('tab-login').className = tab === 'login' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400';
-      document.getElementById('tab-register').className = tab === 'register' ? 'flex-1 py-2 text-sm font-medium rounded-md bg-gray-700 text-white' : 'flex-1 py-2 text-sm font-medium rounded-md text-gray-400';
-    }
+      </div>
 
-    // --- Dashboard ---
-    async function dashboardPage() {
-      const [usage, budget] = await Promise.all([
-        api('/api/usage').catch(() => ({ summary:{}, by_model:[] })),
-        api('/api/budget/alerts').catch(() => ({ alerts:[] }))
-      ]);
-      const s = usage.summary || {};
-      const bal = state.user?.balance || 0;
-      return `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          ${statCard('$' + bal.toFixed(2), 'Balance', '💰')}
-          ${statCard(s.total_requests || 0, 'Requests', '📊')}
-          ${statCard((s.total_tokens || 0).toLocaleString(), 'Tokens', '🔤')}
-          ${statCard(Math.round(s.avg_latency || 0) + 'ms', 'Avg Latency', '⚡')}
+      <!-- ===== MODELS PAGE ===== -->
+      <div id="page-models" class="page">
+        <div class="flex flex-col sm:flex-row gap-4 mb-6">
+          <input type="text" id="modelSearch" placeholder="Search models..." oninput="filterModels()" class="flex-1">
+          <select id="modelProviderFilter" onchange="filterModels()">
+            <option value="">All Providers</option>
+          </select>
         </div>
-        ${budget.alerts?.length ? `<div class="mb-6">${budget.alerts.map(a => `<div class="card p-3 mb-2 border-l-4 ${a.level === 'critical' ? 'border-red-500' : 'border-amber-500'}"><span class="text-sm">${esc(a.message)}</span></div>`).join('')}</div>` : ''}
-        <div class="grid md:grid-cols-2 gap-6">
-          <div class="card p-4">
-            <h3 class="font-semibold mb-3">Usage by Model</h3>
-            <div class="space-y-2">${(usage.by_model || []).map(m => `
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-300">${esc(m.model_id)}</span>
-                <span class="text-emerald-400">$${(m.cost||0).toFixed(4)}</span>
-              </div>`).join('') || '<div class="text-gray-500 text-sm">No usage yet</div>'}</div>
-          </div>
-          <div class="card p-4">
-            <h3 class="font-semibold mb-3">Quick Actions</h3>
-            <div class="space-y-2">
-              <button onclick="navigate('playground')" class="btn btn-ghost w-full text-left">🧪 Test a model</button>
-              <button onclick="navigate('keys')" class="btn btn-ghost w-full text-left">🔑 Create API key</button>
-              <button onclick="navigate('models')" class="btn btn-ghost w-full text-left">🤖 Browse ${state.models.length} models</button>
-              <button onclick="navigate('pricing')" class="btn btn-ghost w-full text-left">💰 View pricing</button>
-            </div>
-          </div>
-        </div>`;
-    }
+        <div id="modelsGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
 
-    // --- Playground ---
-    async function playgroundPage() {
-      if (!state.models.length) {
-        const data = await api('/v1/models');
-        state.models = data.data || [];
-      }
-      return `
-        <div class="grid lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2">
-            <div class="card p-4" style="height: 500px; display:flex; flex-direction:column;">
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="font-semibold">Chat</h3>
-                <select id="playground-model" class="input" style="width:auto;">
-                  ${state.models.map(m => `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join('')}
-                </select>
-              </div>
-              <div id="chat-messages" class="flex-1 overflow-y-auto space-y-2 mb-3 p-2" style="background:#0f172a; border-radius:8px;"></div>
-              <div class="flex gap-2">
-                <input id="chat-input" class="input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()">
-                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div class="card p-4 mb-4">
-              <h3 class="font-semibold mb-3">Parameters</h3>
-              <label class="block text-sm text-gray-400 mb-1">Temperature</label>
-              <input id="param-temp" type="range" min="0" max="2" step="0.1" value="0.7" class="w-full mb-1">
-              <div class="text-xs text-gray-500 mb-3" id="temp-val">0.7</div>
-              <label class="block text-sm text-gray-400 mb-1">Max Tokens</label>
-              <input id="param-tokens" type="number" class="input mb-3" value="1024" min="1" max="128000">
-              <label class="block text-sm text-gray-400 mb-1">System Prompt</label>
-              <textarea id="param-system" class="input mb-3" rows="3" placeholder="You are a helpful assistant..."></textarea>
-            </div>
-            <div class="card p-4">
-              <h3 class="font-semibold mb-3">Model Info</h3>
-              <div id="model-info" class="text-sm text-gray-400">Select a model to see details</div>
-            </div>
-          </div>
-        </div>
-        <script>
-          document.getElementById('param-temp').addEventListener('input', e => {
-            document.getElementById('temp-val').textContent = e.target.value;
-          });
-          document.getElementById('playground-model').addEventListener('change', e => {
-            const m = ${JSON.stringify(state.models)}.find(x => x.id === e.target.value);
-            if (m) document.getElementById('model-info').innerHTML =
-              '<div class="space-y-1">' +
-              '<div>Context: <b>' + (m.context_length||0).toLocaleString() + '</b> tokens</div>' +
-              '<div>Input: <b>$' + ((m.pricing?.prompt||0)*1e6).toFixed(2) + '</b>/M</div>' +
-              '<div>Output: <b>$' + ((m.pricing?.completion||0)*1e6).toFixed(2) + '</b>/M</div>' +
-              '<div>Stream: ' + (m.capabilities?.streaming?'✅':'❌') + '</div>' +
-              '<div>Vision: ' + (m.capabilities?.vision?'✅':'❌') + '</div>' +
-              '<div>Tools: ' + (m.capabilities?.tools?'✅':'❌') + '</div>' +
-              '</div>';
-          });
-        <\/script>`;
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('chat-input');
-      const msg = input.value.trim();
-      if (!msg) return;
-      input.value = '';
-      const msgs = document.getElementById('chat-messages');
-      msgs.innerHTML += `<div class="chat-msg chat-user">${esc(msg)}</div>`;
-      msgs.scrollTop = msgs.scrollHeight;
-
-      const model = document.getElementById('playground-model').value;
-      const temp = parseFloat(document.getElementById('param-temp').value);
-      const maxTokens = parseInt(document.getElementById('param-tokens').value);
-      const system = document.getElementById('param-system').value;
-
-      const messages = [];
-      if (system) messages.push({ role: 'system', content: system });
-      messages.push({ role: 'user', content: msg });
-
-      try {
-        const data = await api('/v1/chat/completions', {
-          method: 'POST',
-          body: JSON.stringify({ model, messages, temperature: temp, max_tokens: maxTokens })
-        });
-        const reply = data.choices?.[0]?.message?.content || 'No response';
-        msgs.innerHTML += `<div class="chat-msg chat-ai">${esc(reply)}</div>`;
-        if (data.webnesti) {
-          msgs.innerHTML += `<div class="text-xs text-gray-500 px-2">Cost: $${data.webnesti.cost_usd} · ${data.webnesti.latency_ms}ms</div>`;
-        }
-      } catch(e) {
-        msgs.innerHTML += `<div class="chat-msg chat-ai" style="background:#7f1d1d;">Error: ${esc(e.message)}</div>`;
-      }
-      msgs.scrollTop = msgs.scrollHeight;
-    }
-
-    // --- Models ---
-    async function modelsPage() {
-      if (!state.models.length) {
-        const data = await api('/v1/models');
-        state.models = data.data || [];
-      }
-      const grouped = {};
-      state.models.forEach(m => { const p = m.owned_by; (grouped[p] = grouped[p] || []).push(m); });
-      return `
-        <div class="mb-4 flex items-center justify-between">
-          <div class="text-sm text-gray-400">${state.models.length} models across ${Object.keys(grouped).length} providers</div>
-          <input class="input" style="width:250px" placeholder="Search models..." oninput="filterModels(this.value)">
-        </div>
-        <div id="models-grid" class="space-y-6">
-          ${Object.entries(grouped).map(([p, list]) => `
-            <div class="provider-group" data-provider="${esc(p)}">
-              <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">${ICONS[p]||'⚪'} ${esc(p)} <span class="text-sm text-gray-500 font-normal">(${list.length})</span></h2>
-              <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                ${list.map(m => `
-                  <div class="card p-4 model-card" data-model="${esc(m.id)}" onclick="showModelDetail('${esc(m.id)}')">
-                    <div class="font-semibold text-white mb-1">${esc(m.id.split('/').pop())}</div>
-                    <div class="text-xs text-gray-500 mb-2">${esc(m.id)}</div>
-                    <div class="flex gap-1 mb-2">
-                      ${m.capabilities?.streaming ? '<span class="badge badge-blue">Stream</span>' : ''}
-                      ${m.capabilities?.vision ? '<span class="badge badge-purple">Vision</span>' : ''}
-                      ${m.capabilities?.tools ? '<span class="badge badge-amber">Tools</span>' : ''}
-                    </div>
-                    <div class="text-xs text-gray-400">
-                      <span class="text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</span> / <span class="text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</span> per M
-                    </div>
-                  </div>`).join('')}
-              </div>
-            </div>`).join('')}
-        </div>`;
-    }
-
-    function filterModels(q) {
-      q = q.toLowerCase();
-      document.querySelectorAll('.model-card').forEach(el => {
-        el.style.display = el.dataset.model.toLowerCase().includes(q) ? '' : 'none';
-      });
-      document.querySelectorAll('.provider-group').forEach(el => {
-        const visible = el.querySelectorAll('.model-card[style=""],.model-card:not([style])');
-        el.style.display = visible.length ? '' : 'none';
-      });
-    }
-
-    function showModelDetail(id) {
-      const m = state.models.find(x => x.id === id);
-      if (!m) return;
-      showModal(`
-        <h2 class="text-xl font-bold mb-4">${esc(m.id.split('/').pop())}</h2>
-        <div class="space-y-3 text-sm">
-          <div><span class="text-gray-400">ID:</span> <b>${esc(m.id)}</b></div>
-          <div><span class="text-gray-400">Provider:</span> ${ICONS[m.owned_by]||'⚪'} ${esc(m.owned_by)}</div>
-          <div><span class="text-gray-400">Context:</span> ${(m.context_length||0).toLocaleString()} tokens</div>
-          <div><span class="text-gray-400">Input:</span> <span class="text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</span>/M tokens</div>
-          <div><span class="text-gray-400">Output:</span> <span class="text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</span>/M tokens</div>
-          <div class="flex gap-2">
-            ${m.capabilities?.streaming ? '<span class="badge badge-blue">Streaming</span>' : ''}
-            ${m.capabilities?.vision ? '<span class="badge badge-purple">Vision</span>' : ''}
-            ${m.capabilities?.tools ? '<span class="badge badge-amber">Tools</span>' : ''}
-          </div>
-          <button onclick="closeModal(); navigate('playground'); document.getElementById('playground-model').value='${esc(m.id)}'" class="btn btn-primary w-full mt-2">🧪 Test in Playground</button>
-        </div>`);
-    }
-
-    // --- API Keys ---
-    async function keysPage() {
-      const data = await api('/api/keys');
-      const keys = data.data || [];
-      return `
-        <div class="flex items-center justify-between mb-4">
-          <div class="text-sm text-gray-400">${keys.length} keys</div>
-          <button onclick="createKey()" class="btn btn-primary">+ Create Key</button>
+      <!-- ===== API KEYS PAGE ===== -->
+      <div id="page-keys" class="page">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-white">Your API Keys</h2>
+          <button onclick="openCreateKeyModal()" class="btn-primary flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Create Key
+          </button>
         </div>
         <div class="card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-gray-800 text-gray-400">
-              <th class="text-left px-4 py-3">Prefix</th><th class="text-left px-4 py-3">Name</th>
-              <th class="text-right px-4 py-3">Rate</th><th class="text-center px-4 py-3">Status</th>
-              <th class="text-right px-4 py-3">Created</th>
-            </tr></thead>
-            <tbody>${keys.map(k => `
-              <tr class="border-b border-gray-800/50 hover:bg-gray-800/20">
-                <td class="px-4 py-3 font-mono text-sky-400">${esc(k.key_prefix)}...</td>
-                <td class="px-4 py-3">${esc(k.name) || '-'}</td>
-                <td class="px-4 py-3 text-right">${k.rate_limit}/min</td>
-                <td class="px-4 py-3 text-center">${k.is_active ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Revoked</span>'}</td>
-                <td class="px-4 py-3 text-right text-gray-500">${(k.created_at||'').slice(0,10)}</td>
-              </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No keys yet</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    }
-
-    async function createKey() {
-      showModal(`
-        <h2 class="text-xl font-bold mb-4">Create API Key</h2>
-        <form onsubmit="event.preventDefault(); doCreateKey()">
-          <label class="block text-sm text-gray-400 mb-1">Key Name</label>
-          <input id="new-key-name" class="input mb-4" placeholder="e.g., my-app" required>
-          <button type="submit" class="btn btn-primary w-full">Create</button>
-        </form>`);
-    }
-
-    async function doCreateKey() {
-      const name = document.getElementById('new-key-name').value;
-      try {
-        const data = await api('/api/keys', { method: 'POST', body: JSON.stringify({ name }) });
-        showModal(`
-          <h2 class="text-xl font-bold mb-4">Key Created!</h2>
-          <p class="text-sm text-gray-400 mb-2">Save this key now — it won't be shown again:</p>
-          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-emerald-400 break-all mb-4">${esc(data.key)}</div>
-          <button onclick="closeModal(); navigate('keys')" class="btn btn-primary w-full">Done</button>`);
-      } catch(e) { toast(e.message, 'error'); }
-    }
-
-    // --- Usage ---
-    async function usagePage() {
-      const data = await api('/api/usage').catch(() => ({ summary:{}, by_model:[], recent:[] }));
-      const s = data.summary || {};
-      return `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          ${statCard(s.total_requests || 0, 'Total Requests', '📊')}
-          ${statCard((s.total_tokens || 0).toLocaleString(), 'Total Tokens', '🔤')}
-          ${statCard('$' + (s.total_cost || 0).toFixed(4), 'Total Cost', '💰')}
-          ${statCard(Math.round(s.avg_latency || 0) + 'ms', 'Avg Latency', '⚡')}
-        </div>
-        <div class="card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-gray-800 text-gray-400">
-              <th class="text-left px-4 py-3">Time</th><th class="text-left px-4 py-3">Model</th>
-              <th class="text-right px-4 py-3">Tokens</th><th class="text-right px-4 py-3">Cost</th>
-              <th class="text-right px-4 py-3">Latency</th>
-            </tr></thead>
-            <tbody>${(data.recent || []).map(r => `
-              <tr class="border-b border-gray-800/50">
-                <td class="px-4 py-3 text-gray-500">${(r.created_at||'').slice(0,16)}</td>
-                <td class="px-4 py-3">${esc(r.model_id)}</td>
-                <td class="px-4 py-3 text-right">${(r.total_tokens||0).toLocaleString()}</td>
-                <td class="px-4 py-3 text-right text-emerald-400">$${(r.cost_usd||0).toFixed(6)}</td>
-                <td class="px-4 py-3 text-right">${r.latency_ms||0}ms</td>
-              </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No usage yet</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    }
-
-    // --- Billing ---
-    async function billingPage() {
-      const [usage, txData] = await Promise.all([
-        api('/api/usage').catch(() => ({ user:{} })),
-        api('/api/billing/transactions').catch(() => ({ data:[] }))
-      ]);
-      const bal = usage.user?.balance || state.user?.balance || 0;
-      return `
-        <div class="card p-6 mb-6" style="background: linear-gradient(135deg, #0c4a6e, #1e3a5f);">
-          <div class="text-sm text-sky-200 mb-1">Current Balance</div>
-          <div class="text-4xl font-bold text-white">$${bal.toFixed(2)}</div>
-          <div class="text-sm text-sky-300 mt-1">Tier: ${esc(state.user?.tier || 'free')}</div>
-        </div>
-        <div class="card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-gray-800 text-gray-400">
-              <th class="text-left px-4 py-3">Date</th><th class="text-left px-4 py-3">Type</th>
-              <th class="text-left px-4 py-3">Description</th><th class="text-right px-4 py-3">Amount</th>
-            </tr></thead>
-            <tbody>${(txData.data || []).map(t => `
-              <tr class="border-b border-gray-800/50">
-                <td class="px-4 py-3 text-gray-500">${(t.created_at||'').slice(0,16)}</td>
-                <td class="px-4 py-3"><span class="badge ${t.type.includes('topup')||t.type.includes('settled') ? 'badge-green' : 'badge-blue'}">${esc(t.type)}</span></td>
-                <td class="px-4 py-3 text-gray-300">${esc(t.description) || '-'}</td>
-                <td class="px-4 py-3 text-right ${t.amount > 0 ? 'text-emerald-400' : 'text-red-400'}">$${t.amount.toFixed(2)}</td>
-              </tr>`).join('') || '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No transactions</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    }
-
-    // --- Pricing ---
-    async function pricingPage() {
-      const [tiers, models] = await Promise.all([
-        api('/api/pricing').catch(() => ({ tiers:[] })),
-        api('/v1/models').catch(() => ({ data:[] }))
-      ]);
-      const current = await api('/api/pricing/current').catch(() => ({}));
-      return `
-        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          ${(tiers.tiers || []).map(t => `
-            <div class="card p-5 ${t.name === current.tier ? 'border-sky-500' : ''}">
-              <div class="text-lg font-bold text-white mb-1 capitalize">${esc(t.name)}</div>
-              <div class="text-2xl font-bold text-sky-400 mb-3">${t.markup_percent}%</div>
-              <div class="text-sm text-gray-400 mb-2">Min: $${t.min_topup_usd}</div>
-              <div class="text-sm text-gray-400 mb-4">Rate: ${t.rate_limit_per_min}/min</div>
-              <ul class="text-xs text-gray-300 space-y-1">${t.features.map(f => `<li>✓ ${esc(f)}</li>`).join('')}</ul>
-              ${t.name === current.tier ? '<div class="mt-3 badge badge-blue">Current</div>' : ''}
-            </div>`).join('')}
-        </div>
-        <h2 class="text-lg font-semibold mb-4">Model Pricing</h2>
-        <div class="card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-gray-800 text-gray-400">
-              <th class="text-left px-4 py-3">Model</th><th class="text-left px-4 py-3">Provider</th>
-              <th class="text-right px-4 py-3">Input $/M</th><th class="text-right px-4 py-3">Output $/M</th>
-            </tr></thead>
-            <tbody>${(models.data || []).map(m => `
-              <tr class="border-b border-gray-800/50 hover:bg-gray-800/20 cursor-pointer" onclick="showModelDetail('${esc(m.id)}')">
-                <td class="px-4 py-3 font-medium">${esc(m.id.split('/').pop())}</td>
-                <td class="px-4 py-3 capitalize text-gray-400">${esc(m.owned_by)}</td>
-                <td class="px-4 py-3 text-right text-emerald-400">$${((m.pricing?.prompt||0)*1e6).toFixed(2)}</td>
-                <td class="px-4 py-3 text-right text-emerald-400">$${((m.pricing?.completion||0)*1e6).toFixed(2)}</td>
-              </tr>`).join('')}</tbody>
-          </table>
-        </div>`;
-    }
-
-    // --- Referral ---
-    async function referralPage() {
-      const ref = await api('/api/referral').catch(() => ({}));
-      return `
-        <div class="grid md:grid-cols-2 gap-6">
-          <div class="card p-6">
-            <h3 class="font-semibold mb-4">Your Referral</h3>
-            <div class="text-sm text-gray-400 mb-1">Code</div>
-            <div class="text-2xl font-mono font-bold text-sky-400 mb-4">${esc(ref.code || 'N/A')}</div>
-            <div class="text-sm text-gray-400 mb-1">Link</div>
-            <div class="bg-gray-800 p-2 rounded-lg font-mono text-xs text-emerald-400 mb-4 break-all">${esc(ref.referral_link || '')}</div>
-            <div class="grid grid-cols-3 gap-3">
-              ${statCard(ref.referrals_count || 0, 'Referrals', '👥')}
-              ${statCard('$' + (ref.total_earned || 0).toFixed(2), 'Earned', '💰')}
-              ${statCard('$' + (ref.reward_per_referral || 5), 'Reward', '🎁')}
-            </div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Name</th><th>Key Prefix</th><th>Rate Limit</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+              <tbody id="keysTable"><tr><td colspan="6" class="text-center text-gray-500 py-8">Loading...</td></tr></tbody>
+            </table>
           </div>
-          <div class="card p-6">
-            <h3 class="font-semibold mb-4">How It Works</h3>
-            <div class="space-y-4">
-              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">1</div><div>Share your referral link</div></div>
-              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">2</div><div>Friend signs up & makes 1 API request</div></div>
-              <div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center text-sm font-bold">3</div><div>You get $5, they get $2</div></div>
-            </div>
-          </div>
-        </div>`;
-    }
+        </div>
+      </div>
 
-    // --- API Docs ---
-    async function docsPage() {
-      const spec = await api('/v1/openapi.json').catch(() => ({}));
-      const paths = spec.paths || {};
-      return `
+      <!-- ===== USAGE PAGE ===== -->
+      <div id="page-usage" class="page">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="stat-card"><span class="text-gray-400 text-sm">Total Requests</span><div class="text-2xl font-bold text-white mt-2" id="usageRequests">0</div></div>
+          <div class="stat-card"><span class="text-gray-400 text-sm">Total Tokens</span><div class="text-2xl font-bold text-white mt-2" id="usageTokens">0</div></div>
+          <div class="stat-card"><span class="text-gray-400 text-sm">Total Cost</span><div class="text-2xl font-bold text-white mt-2" id="usageCost">$0.00</div></div>
+          <div class="stat-card"><span class="text-gray-400 text-sm">Avg Latency</span><div class="text-2xl font-bold text-white mt-2" id="usageLatency">0ms</div></div>
+        </div>
         <div class="card p-6 mb-6">
-          <h3 class="font-semibold mb-2">API Base URL</h3>
-          <div class="bg-gray-800 p-3 rounded-lg font-mono text-sm text-sky-400">${window.location.origin}</div>
+          <h3 class="text-white font-semibold mb-4">Usage Over Time</h3>
+          <div style="height:300px"><canvas id="usageChart"></canvas></div>
         </div>
-        <div class="space-y-3">
-          ${Object.entries(paths).map(([path, methods]) => Object.entries(methods).map(([method, info]) => `
-            <div class="card p-4">
-              <div class="flex items-center gap-3 mb-2">
-                <span class="badge ${method === 'get' ? 'badge-green' : method === 'post' ? 'badge-blue' : method === 'put' ? 'badge-amber' : 'badge-red'}">${method.toUpperCase()}</span>
-                <code class="font-mono text-sm">${esc(path)}</code>
+        <div class="card overflow-hidden">
+          <div class="p-4 border-b border-gray-800"><h3 class="text-white font-semibold">Recent Requests</h3></div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Time</th><th>Model</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost</th><th>Latency</th></tr></thead>
+              <tbody id="usageTable"><tr><td colspan="6" class="text-center text-gray-500 py-8">No usage data yet</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== BILLING PAGE ===== -->
+      <div id="page-billing" class="page">
+        <div class="card p-6 mb-6 relative overflow-hidden">
+          <div class="absolute inset-0 gradient-animated opacity-5"></div>
+          <div class="relative z-10">
+            <div class="text-sm text-gray-400 mb-1">Available Balance</div>
+            <div class="text-4xl font-bold text-white mb-4" id="billingBalance">$0.00</div>
+            <button onclick="showToast('Top-up via Midtrans coming soon!','info')" class="btn-primary">Add Credits</button>
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="p-4 border-b border-gray-800"><h3 class="text-white font-semibold">Transaction History</h3></div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Status</th></tr></thead>
+              <tbody id="billingTable"><tr><td colspan="5" class="text-center text-gray-500 py-8">No transactions yet</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PRICING PAGE ===== -->
+      <div id="page-pricing" class="page">
+        <div class="text-center mb-10">
+          <h2 class="text-3xl font-bold text-white mb-2">Pricing Plans</h2>
+          <p class="text-gray-400">Choose the plan that fits your needs</p>
+        </div>
+        <div class="grid md:grid-cols-4 gap-6 mb-12">
+          <div class="card p-6 text-center">
+            <div class="text-gray-400 text-sm font-semibold mb-2">FREE</div>
+            <div class="text-3xl font-bold text-white mb-1">$0</div><div class="text-gray-500 text-sm mb-6">forever</div>
+            <ul class="text-sm text-gray-400 space-y-2 text-left mb-6"><li>• $1 free credits</li><li>• 5 API keys</li><li>• 60 RPM</li><li>• Community support</li></ul>
+            <button class="btn-secondary w-full">Current Plan</button>
+          </div>
+          <div class="card p-6 text-center">
+            <div class="text-gray-400 text-sm font-semibold mb-2">STARTER</div>
+            <div class="text-3xl font-bold text-white mb-1">$9</div><div class="text-gray-500 text-sm mb-6">/month</div>
+            <ul class="text-sm text-gray-400 space-y-2 text-left mb-6"><li>• $10 credits/mo</li><li>• 15 API keys</li><li>• 300 RPM</li><li>• Email support</li></ul>
+            <button onclick="handleUpgrade('starter')" class="btn-secondary w-full">Upgrade</button>
+          </div>
+          <div class="p-6 text-center rounded-2xl border-2 border-sky-500" style="background:linear-gradient(180deg,rgba(14,165,233,0.08),#0f172a)">
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-sky-500 text-white text-xs font-bold rounded-full" style="position:relative;margin-top:-12px;display:inline-block">POPULAR</div>
+            <div class="text-sky-400 text-sm font-semibold mb-2">PRO</div>
+            <div class="text-3xl font-bold text-white mb-1">$29</div><div class="text-gray-500 text-sm mb-6">/month</div>
+            <ul class="text-sm text-gray-400 space-y-2 text-left mb-6"><li>• $50 credits/mo</li><li>• 50 API keys</li><li>• 1000 RPM</li><li>• Priority support</li></ul>
+            <button onclick="handleUpgrade('pro')" class="btn-primary w-full">Upgrade</button>
+          </div>
+          <div class="card p-6 text-center">
+            <div class="text-gray-400 text-sm font-semibold mb-2">ENTERPRISE</div>
+            <div class="text-3xl font-bold text-white mb-1">Custom</div><div class="text-gray-500 text-sm mb-6">contact us</div>
+            <ul class="text-sm text-gray-400 space-y-2 text-left mb-6"><li>• Custom credits</li><li>• Unlimited keys</li><li>• Unlimited RPM</li><li>• Dedicated support</li></ul>
+            <button class="btn-secondary w-full">Contact Sales</button>
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div class="p-4 border-b border-gray-800"><h3 class="text-white font-semibold">Model Pricing</h3></div>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Model</th><th>Provider</th><th>Input (per 1M tokens)</th><th>Output (per 1M tokens)</th></tr></thead>
+              <tbody id="pricingTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== REFERRAL PAGE ===== -->
+      <div id="page-referral" class="page">
+        <div class="text-center mb-10">
+          <h2 class="text-3xl font-bold text-white mb-2">Refer & Earn</h2>
+          <p class="text-gray-400">Invite friends and earn credits for every sign-up</p>
+        </div>
+        <div class="card p-8 text-center mb-8 max-w-lg mx-auto">
+          <div class="text-sm text-gray-400 mb-2">Your Referral Code</div>
+          <div class="flex items-center justify-center gap-3">
+            <code class="text-2xl font-bold text-sky-400 bg-sky-500/10 px-6 py-3 rounded-xl" id="refCode">Loading...</code>
+            <button onclick="copyReferralCode()" class="btn-secondary px-4 py-3" title="Copy">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6 mb-10">
+          <div class="stat-card text-center">
+            <div class="text-3xl font-bold text-white" id="refTotal">0</div>
+            <div class="text-sm text-gray-400 mt-1">Total Referrals</div>
+          </div>
+          <div class="stat-card text-center">
+            <div class="text-3xl font-bold text-white" id="refEarned">$0.00</div>
+            <div class="text-sm text-gray-400 mt-1">Credits Earned</div>
+          </div>
+          <div class="stat-card text-center">
+            <div class="text-3xl font-bold text-white" id="refPending">0</div>
+            <div class="text-sm text-gray-400 mt-1">Pending</div>
+          </div>
+        </div>
+        <div class="max-w-2xl mx-auto">
+          <h3 class="text-white font-semibold mb-6 text-center">How It Works</h3>
+          <div class="space-y-6">
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-full gradient-animated flex items-center justify-center text-white font-bold flex-shrink-0">1</div>
+              <div><h4 class="text-white font-medium mb-1">Share your code</h4><p class="text-sm text-gray-400">Send your unique referral code to friends and colleagues.</p></div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-full gradient-animated flex items-center justify-center text-white font-bold flex-shrink-0">2</div>
+              <div><h4 class="text-white font-medium mb-1">They sign up</h4><p class="text-sm text-gray-400">Your friend creates an account using your referral code.</p></div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-10 h-10 rounded-full gradient-animated flex items-center justify-center text-white font-bold flex-shrink-0">3</div>
+              <div><h4 class="text-white font-medium mb-1">Both earn credits</h4><p class="text-sm text-gray-400">You both receive $1.00 in free credits. No limit on referrals!</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== API DOCS PAGE ===== -->
+      <div id="page-docs" class="page">
+        <div class="mb-8">
+          <h2 class="text-3xl font-bold text-white mb-2">API Documentation</h2>
+          <p class="text-gray-400 mb-4">Complete reference for the WebNesti API</p>
+          <div class="card p-4 inline-block">
+            <span class="text-sm text-gray-400">Base URL:</span>
+            <code class="text-sky-400 ml-2 font-mono" id="docsBaseUrl">https://api.webnesti.com</code>
+            <button onclick="copyToClipboard(document.getElementById('docsBaseUrl').textContent)" class="ml-2 text-gray-500 hover:text-sky-400 transition"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+          </div>
+        </div>
+        <div class="space-y-3" id="apiDocsList">
+          <!-- Auth -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Authentication</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-sm text-gray-300 font-mono">/api/auth/register</code>
+                <span class="text-xs text-gray-500 ml-auto">Register a new account</span>
               </div>
-              <div class="text-sm text-gray-400">${esc(info.summary || '')}</div>
-            </div>`).join('')).join('')}
-        </div>`;
-    }
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-sm text-gray-300 font-mono">/api/auth/login</code>
+                <span class="text-xs text-gray-500 ml-auto">Sign in and get JWT token</span>
+              </div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-sm text-gray-300 font-mono">/api/auth/me</code>
+                <span class="text-xs text-gray-500 ml-auto">Get current user profile</span>
+              </div>
+            </div>
+          </div>
+          <!-- Chat Completions -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>Chat Completions</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-sm text-gray-300 font-mono">/v1/chat/completions</code>
+                <span class="text-xs text-gray-500 ml-auto">Create chat completion (OpenAI-compatible)</span>
+              </div>
+            </div>
+          </div>
+          <!-- Models -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Models</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-sm text-gray-300 font-mono">/v1/models</code>
+                <span class="text-xs text-gray-500 ml-auto">List all available models</span>
+              </div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-sm text-gray-300 font-mono">/v1/models/:id</code>
+                <span class="text-xs text-gray-500 ml-auto">Get model details</span>
+              </div>
+            </div>
+          </div>
+          <!-- API Keys -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>API Keys</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-sm text-gray-300 font-mono">/api/keys</code>
+                <span class="text-xs text-gray-500 ml-auto">List all API keys</span>
+              </div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-sm text-gray-300 font-mono">/api/keys</code>
+                <span class="text-xs text-gray-500 ml-auto">Create a new API key</span>
+              </div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 hover:bg-gray-800/50 transition cursor-pointer" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-delete">DELETE</span>
+                <code class="text-sm text-gray-300 font-mono">/api/keys/:id</code>
+                <span class="text-xs text-gray-500 ml-auto">Revoke an API key</span>
+              </div>
+            </div>
+          </div>
+          <!-- Billing -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>Billing & Usage</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/usage</code><span class="text-xs text-gray-500 ml-auto">Get usage statistics</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/billing/transactions</code><span class="text-xs text-gray-500 ml-auto">List transactions</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-post">POST</span><code class="text-sm text-gray-300 font-mono">/api/billing/topup</code><span class="text-xs text-gray-500 ml-auto">Initiate top-up</span></div>
+            </div>
+          </div>
+          <!-- Pricing -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>Pricing & Budget</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/pricing</code><span class="text-xs text-gray-500 ml-auto">Get all pricing info</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/pricing/current</code><span class="text-xs text-gray-500 ml-auto">Get current plan</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-post">POST</span><code class="text-sm text-gray-300 font-mono">/api/pricing/upgrade</code><span class="text-xs text-gray-500 ml-auto">Upgrade plan</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/budget</code><span class="text-xs text-gray-500 ml-auto">Get budget settings</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-put">PUT</span><code class="text-sm text-gray-300 font-mono">/api/budget</code><span class="text-xs text-gray-500 ml-auto">Update budget</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/budget/alerts</code><span class="text-xs text-gray-500 ml-auto">Get budget alerts</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/calculate</code><span class="text-xs text-gray-500 ml-auto">Calculate cost</span></div>
+            </div>
+          </div>
+          <!-- Referral -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Referral</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/api/referral</code><span class="text-xs text-gray-500 ml-auto">Get referral info</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-post">POST</span><code class="text-sm text-gray-300 font-mono">/api/referral/apply</code><span class="text-xs text-gray-500 ml-auto">Apply referral code</span></div>
+            </div>
+          </div>
+          <!-- System -->
+          <div class="card p-5">
+            <h3 class="text-white font-semibold mb-4 flex items-center gap-2"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>System</h3>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/health</code><span class="text-xs text-gray-500 ml-auto">Health check</span></div>
+              <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50"><span class="method-badge method-get">GET</span><code class="text-sm text-gray-300 font-mono">/v1/openapi.json</code><span class="text-xs text-gray-500 ml-auto">OpenAPI specification</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    // --- Settings ---
-    async function settingsPage() {
-      return `
-        <div class="grid md:grid-cols-2 gap-6">
+      <!-- ===== SETTINGS PAGE ===== -->
+      <div id="page-settings" class="page">
+        <div class="max-w-2xl space-y-6">
           <div class="card p-6">
-            <h3 class="font-semibold mb-4">Profile</h3>
-            <div class="space-y-3">
-              <div><span class="text-gray-400">Email:</span> ${esc(state.user?.email)}</div>
-              <div><span class="text-gray-400">Name:</span> ${esc(state.user?.name)}</div>
-              <div><span class="text-gray-400">Tier:</span> <span class="badge badge-blue">${esc(state.user?.tier)}</span></div>
-              <div><span class="text-gray-400">Balance:</span> $${(state.user?.balance || 0).toFixed(2)}</div>
+            <h3 class="text-white font-semibold mb-4">Profile Information</h3>
+            <div class="space-y-4">
+              <div><label class="text-sm text-gray-400 mb-1 block">Name</label><input type="text" id="settingsName" readonly></div>
+              <div><label class="text-sm text-gray-400 mb-1 block">Email</label><input type="email" id="settingsEmail" readonly></div>
+              <div><label class="text-sm text-gray-400 mb-1 block">Account ID</label><input type="text" id="settingsId" readonly class="font-mono text-sm"></div>
+              <div><label class="text-sm text-gray-400 mb-1 block">Member Since</label><input type="text" id="settingsCreated" readonly></div>
             </div>
           </div>
           <div class="card p-6">
-            <h3 class="font-semibold mb-4">API Info</h3>
-            <div class="space-y-3">
-              <div><span class="text-gray-400">Base URL:</span> <code class="text-sky-400">${window.location.origin}</code></div>
-              <div><span class="text-gray-400">Auth:</span> <code class="text-sky-400">Bearer wn_...</code></div>
-              <div><span class="text-gray-400">Format:</span> OpenAI-compatible</div>
-              <div><span class="text-gray-400">Models:</span> ${state.models.length} available</div>
+            <h3 class="text-white font-semibold mb-4">API Information</h3>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                <div><div class="text-sm text-gray-400">Base URL</div><code class="text-sm text-sky-400 font-mono" id="settingsBaseUrl">-</code></div>
+                <button onclick="copyToClipboard(document.getElementById('settingsBaseUrl').textContent)" class="text-gray-500 hover:text-sky-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+              </div>
+              <div class="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                <div><div class="text-sm text-gray-400">Current Plan</div><span class="text-sm text-white font-medium" id="settingsPlan">Free</span></div>
+                <button onclick="navigate('pricing')" class="text-sky-400 text-sm hover:underline">Upgrade</button>
+              </div>
             </div>
           </div>
-        </div>`;
+          <div class="card p-6">
+            <h3 class="text-white font-semibold mb-4">Account Management</h3>
+            <div class="space-y-3">
+              <button onclick="handleLogout()" class="btn-secondary w-full text-left flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ===== CORE APP =====
+const API_BASE = window.location.origin;
+let token = localStorage.getItem('wn_token') || null;
+let currentUser = null;
+let charts = {};
+let allModels = [];
+let isStreaming = false;
+
+// XSS Protection
+function esc(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+// Toast Notifications
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const icons = {
+    success: '<svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>',
+    error: '<svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>',
+    info: '<svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>'
+  };
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `${icons[type] || icons.info}<span>${esc(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(20px)'; toast.style.transition = 'all .3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+}
+
+// Modal System
+function openModal(html) {
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// Copy to clipboard
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!', 'success')).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('Copied to clipboard!', 'success');
+  });
+}
+
+// API Helper
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...opts, headers: { ...headers, ...opts.headers } });
+    if (res.status === 401) { handleLogout(); throw new Error('Unauthorized'); }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    return data;
+  } catch (e) {
+    if (e.message !== 'Unauthorized') console.error('API Error:', e);
+    throw e;
+  }
+}
+
+// ===== NAVIGATION =====
+function showPage(page) {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('appLayout').style.display = 'none';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+  if (page === 'landing') {
+    document.getElementById('landingPage').style.display = 'block';
+  } else if (page === 'login' || page === 'register') {
+    document.getElementById('authPage').style.display = 'flex';
+    toggleAuthForm(page);
+  } else {
+    document.getElementById('appLayout').style.display = 'block';
+    const pageEl = document.getElementById(`page-${page}`);
+    if (pageEl) { pageEl.classList.add('active'); }
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+    const titles = { dashboard:'Dashboard', playground:'Playground', models:'Models', keys:'API Keys', usage:'Usage', billing:'Billing', pricing:'Pricing', referral:'Referral', docs:'API Docs', settings:'Settings' };
+    document.getElementById('pageTitle').textContent = titles[page] || page;
+    loadPageData(page);
+  }
+}
+
+function navigate(page) {
+  if (window.innerWidth < 769) toggleSidebar();
+  showPage(page);
+  history.pushState({ page }, '', `#${page}`);
+}
+
+function toggleAuthForm(form) {
+  document.getElementById('loginForm').style.display = form === 'login' ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = form === 'register' ? 'block' : 'none';
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mobileOverlay').classList.toggle('show');
+}
+
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== AUTH =====
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+  try {
+    const data = await api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value })
+    });
+    token = data.token;
+    localStorage.setItem('wn_token', token);
+    showToast('Welcome back!', 'success');
+    await loadUser();
+    showPage('dashboard');
+  } catch (e) { showToast(e.message, 'error'); }
+  btn.textContent = 'Sign In'; btn.disabled = false;
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('regBtn');
+  btn.textContent = 'Creating account...'; btn.disabled = true;
+  try {
+    const body = { name: document.getElementById('regName').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value };
+    const ref = document.getElementById('regReferral').value.trim();
+    if (ref) body.referral_code = ref;
+    const data = await api('/api/auth/register', { method: 'POST', body: JSON.stringify(body) });
+    token = data.token;
+    localStorage.setItem('wn_token', token);
+    showToast('Account created! Welcome to WebNesti!', 'success');
+    await loadUser();
+    showPage('dashboard');
+  } catch (e) { showToast(e.message, 'error'); }
+  btn.textContent = 'Create Account'; btn.disabled = false;
+}
+
+function handleLogout() {
+  token = null;
+  currentUser = null;
+  localStorage.removeItem('wn_token');
+  showPage('landing');
+  showToast('Signed out', 'info');
+}
+
+async function loadUser() {
+  try {
+    const data = await api('/api/auth/me');
+    currentUser = data.user || data;
+    document.getElementById('userName').textContent = esc(currentUser.name);
+    document.getElementById('userEmail').textContent = esc(currentUser.email);
+    document.getElementById('userAvatar').textContent = esc((currentUser.name || 'U')[0].toUpperCase());
+    updateTopBarBalance();
+  } catch (e) { console.error('Failed to load user:', e); }
+}
+
+function updateTopBarBalance() {
+  const bal = currentUser?.balance ?? 0;
+  document.getElementById('topBarBalance').textContent = `$${Number(bal).toFixed(2)}`;
+}
+
+// ===== PAGE DATA LOADERS =====
+async function loadPageData(page) {
+  switch (page) {
+    case 'dashboard': return loadDashboard();
+    case 'models': return loadModels();
+    case 'keys': return loadKeys();
+    case 'usage': return loadUsage();
+    case 'billing': return loadBilling();
+    case 'pricing': return loadPricingTable();
+    case 'referral': return loadReferral();
+    case 'settings': return loadSettings();
+  }
+}
+
+// Dashboard
+async function loadDashboard() {
+  try {
+    const [usageData, billingData] = await Promise.all([
+      api('/api/usage').catch(() => ({ requests: [], stats: {} })),
+      api('/api/billing/transactions').catch(() => ({ balance: 0, transactions: [] }))
+    ]);
+    const stats = usageData.stats || {};
+    const bal = billingData.balance ?? currentUser?.balance ?? 0;
+    document.getElementById('dashBalance').textContent = `$${Number(bal).toFixed(2)}`;
+    document.getElementById('topBarBalance').textContent = `$${Number(bal).toFixed(2)}`;
+    document.getElementById('dashRequests').textContent = (stats.total_requests ?? 0).toLocaleString();
+    document.getElementById('dashTokens').textContent = (stats.total_tokens ?? 0).toLocaleString();
+    document.getElementById('dashLatency').textContent = `${Math.round(stats.avg_latency ?? 0)}ms`;
+
+    // Recent activity
+    const requests = usageData.requests || [];
+    const tbody = document.getElementById('dashActivity');
+    if (requests.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-8">No activity yet. Make your first API call!</td></tr>';
+    } else {
+      tbody.innerHTML = requests.slice(0, 10).map(r => `<tr>
+        <td class="text-gray-400">${esc(formatDate(r.created_at || r.timestamp))}</td>
+        <td><span class="bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded text-xs font-medium">${esc(r.model || '-')}</span></td>
+        <td>${esc((r.total_tokens || r.tokens || 0).toLocaleString())}</td>
+        <td class="text-green-400">$${Number(r.cost || 0).toFixed(4)}</td>
+        <td>${esc(r.latency || r.response_time || '-')}${typeof r.latency === 'number' || typeof r.response_time === 'number' ? 'ms' : ''}</td>
+        <td><span class="text-green-400 text-xs">OK</span></td>
+      </tr>`).join('');
     }
+    renderDashChart(requests);
+  } catch (e) { console.error('Dashboard load error:', e); }
+}
 
-    // ============ HELPERS ============
-    function statCard(value, label, icon) {
-      return `<div class="stat-card"><div class="text-2xl mb-2">${icon}</div><div class="text-2xl font-bold text-white">${value}</div><div class="text-sm text-gray-400">${label}</div></div>`;
+function renderDashChart(requests) {
+  const ctx = document.getElementById('dashChart');
+  if (!ctx) return;
+  if (charts.dash) charts.dash.destroy();
+  const labels = [];
+  const data = [];
+  const now = Date.now();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+    const dayStart = new Date(d); dayStart.setHours(0,0,0,0);
+    const dayEnd = new Date(d); dayEnd.setHours(23,59,59,999);
+    const count = requests.filter(r => { const t = new Date(r.created_at || r.timestamp); return t >= dayStart && t <= dayEnd; }).length;
+    data.push(count);
+  }
+  charts.dash = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Requests', data, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0ea5e9', borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(31,41,55,0.5)' }, ticks: { color: '#6b7280', font: { size: 11 } } }, y: { grid: { color: 'rgba(31,41,55,0.5)' }, ticks: { color: '#6b7280', font: { size: 11 } }, beginAtZero: true } } }
+  });
+}
+
+// Models
+async function loadModels() {
+  try {
+    const data = await api('/v1/models');
+    allModels = data.data || data.models || data || [];
+    populateProviderFilter();
+    renderModels(allModels);
+  } catch (e) { showToast('Failed to load models', 'error'); }
+}
+
+function populateProviderFilter() {
+  const providers = [...new Set(allModels.map(m => m.provider || m.owned_by || 'Unknown'))].sort();
+  const sel = document.getElementById('modelProviderFilter');
+  sel.innerHTML = '<option value="">All Providers</option>' + providers.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+}
+
+function renderModels(models) {
+  const grid = document.getElementById('modelsGrid');
+  if (models.length === 0) {
+    grid.innerHTML = '<div class="col-span-full text-center text-gray-500 py-12">No models found</div>';
+    return;
+  }
+  const providerColors = { openai: 'green', anthropic: 'purple', google: 'blue', meta: 'cyan', mistral: 'amber', cohere: 'rose', 'x-ai': 'sky', deepseek: 'indigo' };
+  grid.innerHTML = models.map(m => {
+    const provider = m.provider || m.owned_by || 'Unknown';
+    const color = providerColors[provider.toLowerCase()] || 'gray';
+    return `<div class="card p-5 cursor-pointer hover:border-sky-500/50 transition" onclick="showModelModal('${esc(m.id)}')">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="provider-badge bg-${color}-500/10 text-${color}-400 border border-${color}-500/20">${esc(provider)}</span>
+      </div>
+      <h3 class="text-white font-semibold text-sm mb-1">${esc(m.id || m.name)}</h3>
+      <p class="text-gray-500 text-xs">${esc(m.description || `${provider} model`)}</p>
+      ${m.pricing ? `<div class="mt-3 flex gap-3 text-xs text-gray-400">
+        <span>In: $${Number(m.pricing.prompt || 0).toFixed(4)}/1K</span>
+        <span>Out: $${Number(m.pricing.completion || 0).toFixed(4)}/1K</span>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function filterModels() {
+  const search = document.getElementById('modelSearch').value.toLowerCase();
+  const provider = document.getElementById('modelProviderFilter').value;
+  const filtered = allModels.filter(m => {
+    const name = (m.id || m.name || '').toLowerCase();
+    const prov = m.provider || m.owned_by || '';
+    return (!search || name.includes(search)) && (!provider || prov === provider);
+  });
+  renderModels(filtered);
+}
+
+function showModelModal(id) {
+  const m = allModels.find(x => x.id === id);
+  if (!m) return;
+  const provider = m.provider || m.owned_by || 'Unknown';
+  openModal(`
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-white">${esc(m.id || m.name)}</h2>
+      <button onclick="closeModal()" class="text-gray-500 hover:text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="space-y-3 mb-6">
+      <div class="flex justify-between text-sm"><span class="text-gray-400">Provider</span><span class="text-white">${esc(provider)}</span></div>
+      <div class="flex justify-between text-sm"><span class="text-gray-400">Context Window</span><span class="text-white">${esc((m.context_length || m.context_window || 'N/A').toLocaleString())}</span></div>
+      ${m.pricing ? `<div class="flex justify-between text-sm"><span class="text-gray-400">Input Price</span><span class="text-white">$${Number(m.pricing.prompt || 0).toFixed(4)}/1K tokens</span></div>
+      <div class="flex justify-between text-sm"><span class="text-gray-400">Output Price</span><span class="text-white">$${Number(m.pricing.completion || 0).toFixed(4)}/1K tokens</span></div>` : ''}
+    </div>
+    <button onclick="closeModal();navigate('playground');document.getElementById('pgModel').value='${esc(id)}'" class="btn-primary w-full">Test in Playground</button>
+  `);
+}
+
+// API Keys
+async function loadKeys() {
+  try {
+    const data = await api('/api/keys');
+    const keys = data.keys || data || [];
+    const tbody = document.getElementById('keysTable');
+    if (keys.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-8">No API keys. Create your first one!</td></tr>';
+      return;
     }
+    tbody.innerHTML = keys.map(k => `<tr>
+      <td class="text-white font-medium">${esc(k.name || 'Unnamed')}</td>
+      <td><code class="text-sm text-gray-400 font-mono">${esc(k.key_prefix || k.prefix || '••••')}</code></td>
+      <td>${esc(k.rate_limit || k.rateLimit || 60)} RPM</td>
+      <td><span class="px-2 py-0.5 rounded text-xs font-medium ${k.active !== false ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}">${k.active !== false ? 'Active' : 'Revoked'}</span></td>
+      <td class="text-gray-400 text-sm">${esc(formatDate(k.created_at || k.createdAt))}</td>
+      <td>${k.active !== false ? `<button onclick="revokeKey('${esc(k.id)}')" class="text-red-400 hover:text-red-300 text-sm">Revoke</button>` : '<span class="text-gray-600 text-sm">—</span>'}</td>
+    </tr>`).join('');
+  } catch (e) { showToast('Failed to load API keys', 'error'); }
+}
 
-    // ============ ROUTER ============
-    const pages = {
-      dashboard: { title: 'Dashboard', fn: dashboardPage },
-      playground: { title: 'Playground', fn: playgroundPage },
-      models: { title: 'Models', fn: modelsPage },
-      keys: { title: 'API Keys', fn: keysPage },
-      usage: { title: 'Usage', fn: usagePage },
-      billing: { title: 'Billing', fn: billingPage },
-      pricing: { title: 'Pricing', fn: pricingPage },
-      referral: { title: 'Referral', fn: referralPage },
-      docs: { title: 'API Docs', fn: docsPage },
-      settings: { title: 'Settings', fn: settingsPage },
-    };
+function openCreateKeyModal() {
+  openModal(`
+    <h2 class="text-xl font-bold text-white mb-6">Create API Key</h2>
+    <form onsubmit="createKey(event)" class="space-y-4">
+      <div><label class="text-sm text-gray-400 mb-1 block">Key Name</label><input type="text" id="newKeyName" placeholder="My API Key" required></div>
+      <div><label class="text-sm text-gray-400 mb-1 block">Rate Limit (RPM)</label><input type="number" id="newKeyRate" value="60" min="1" max="10000"></div>
+      <button type="submit" class="btn-primary w-full" id="createKeyBtn">Create Key</button>
+    </form>
+  `);
+}
 
-    function navigate(page) {
-      window.location.hash = '#/' + page;
+async function createKey(e) {
+  e.preventDefault();
+  const btn = document.getElementById('createKeyBtn');
+  btn.textContent = 'Creating...'; btn.disabled = true;
+  try {
+    const data = await api('/api/keys', {
+      method: 'POST',
+      body: JSON.stringify({ name: document.getElementById('newKeyName').value, rate_limit: parseInt(document.getElementById('newKeyRate').value) || 60 })
+    });
+    const key = data.key || data.api_key || data.token;
+    closeModal();
+    openModal(`
+      <h2 class="text-xl font-bold text-white mb-4">API Key Created</h2>
+      <p class="text-sm text-gray-400 mb-4">Copy your key now. It won't be shown again.</p>
+      <div class="flex items-center gap-2 p-3 bg-gray-900 rounded-lg mb-6">
+        <code class="text-sm text-sky-400 font-mono flex-1 break-all" id="newKeyValue">${esc(key)}</code>
+        <button onclick="copyToClipboard('${esc(key)}')" class="btn-secondary px-3 py-1 text-sm flex-shrink-0">Copy</button>
+      </div>
+      <button onclick="closeModal();loadKeys()" class="btn-primary w-full">Done</button>
+    `);
+    showToast('API key created!', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+  btn.textContent = 'Create Key'; btn.disabled = false;
+}
+
+async function revokeKey(id) {
+  if (!confirm('Revoke this API key? This cannot be undone.')) return;
+  try {
+    await api(`/api/keys/${id}`, { method: 'DELETE' });
+    showToast('API key revoked', 'success');
+    loadKeys();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// Usage
+async function loadUsage() {
+  try {
+    const data = await api('/api/usage');
+    const stats = data.stats || {};
+    const requests = data.requests || [];
+    document.getElementById('usageRequests').textContent = (stats.total_requests ?? 0).toLocaleString();
+    document.getElementById('usageTokens').textContent = (stats.total_tokens ?? 0).toLocaleString();
+    document.getElementById('usageCost').textContent = `$${Number(stats.total_cost ?? 0).toFixed(2)}`;
+    document.getElementById('usageLatency').textContent = `${Math.round(stats.avg_latency ?? 0)}ms`;
+
+    const tbody = document.getElementById('usageTable');
+    if (requests.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-8">No usage data yet</td></tr>';
+    } else {
+      tbody.innerHTML = requests.slice(0, 20).map(r => `<tr>
+        <td class="text-gray-400">${esc(formatDate(r.created_at || r.timestamp))}</td>
+        <td><span class="bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded text-xs font-medium">${esc(r.model || '-')}</span></td>
+        <td>${esc((r.input_tokens || r.prompt_tokens || 0).toLocaleString())}</td>
+        <td>${esc((r.output_tokens || r.completion_tokens || 0).toLocaleString())}</td>
+        <td class="text-green-400">$${Number(r.cost || 0).toFixed(4)}</td>
+        <td>${esc(r.latency || r.response_time || '-')}${typeof r.latency === 'number' || typeof r.response_time === 'number' ? 'ms' : ''}</td>
+      </tr>`).join('');
     }
+    renderUsageChart(requests);
+  } catch (e) { console.error('Usage load error:', e); }
+}
 
-    async function renderRoute() {
-      if (!state.user) {
-        document.getElementById('sidebar').style.display = 'none';
-        document.querySelector('.main').style.marginLeft = '0';
-        document.getElementById('app').innerHTML = authPage();
-        return;
-      }
-      document.getElementById('sidebar').style.display = '';
-      document.querySelector('.main').style.marginLeft = '';
+function renderUsageChart(requests) {
+  const ctx = document.getElementById('usageChart');
+  if (!ctx) return;
+  if (charts.usage) charts.usage.destroy();
+  const labels = []; const data = []; const costs = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+    const ds = new Date(d); ds.setHours(0,0,0,0);
+    const de = new Date(d); de.setHours(23,59,59,999);
+    const dayReqs = requests.filter(r => { const t = new Date(r.created_at || r.timestamp); return t >= ds && t <= de; });
+    data.push(dayReqs.length);
+    costs.push(dayReqs.reduce((s, r) => s + Number(r.cost || 0), 0));
+  }
+  charts.usage = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Requests', data, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0ea5e9', borderWidth: 2, yAxisID: 'y' },
+      { label: 'Cost ($)', data: costs, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#8b5cf6', borderWidth: 2, yAxisID: 'y1' }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } }, scales: {
+      x: { grid: { color: 'rgba(31,41,55,0.5)' }, ticks: { color: '#6b7280', font: { size: 11 } } },
+      y: { position: 'left', grid: { color: 'rgba(31,41,55,0.5)' }, ticks: { color: '#6b7280', font: { size: 11 } }, beginAtZero: true },
+      y1: { position: 'right', grid: { display: false }, ticks: { color: '#8b5cf6', font: { size: 11 } }, beginAtZero: true }
+    } }
+  });
+}
 
-      const hash = window.location.hash.replace('#/', '') || 'dashboard';
-      const page = pages[hash] || pages.dashboard;
+// Billing
+async function loadBilling() {
+  try {
+    const data = await api('/api/billing/transactions');
+    document.getElementById('billingBalance').textContent = `$${Number(data.balance ?? 0).toFixed(2)}`;
+    document.getElementById('topBarBalance').textContent = `$${Number(data.balance ?? 0).toFixed(2)}`;
+    const txns = data.transactions || [];
+    const tbody = document.getElementById('billingTable');
+    if (txns.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-8">No transactions yet</td></tr>';
+    } else {
+      tbody.innerHTML = txns.map(t => `<tr>
+        <td class="text-gray-400">${esc(formatDate(t.created_at || t.timestamp))}</td>
+        <td><span class="px-2 py-0.5 rounded text-xs font-medium ${t.type === 'credit' || t.type === 'topup' ? 'bg-green-500/10 text-green-400' : 'bg-amber-500/10 text-amber-400'}">${esc(t.type || '-')}</span></td>
+        <td class="${Number(t.amount) >= 0 ? 'text-green-400' : 'text-red-400'}">${Number(t.amount) >= 0 ? '+' : ''}$${Number(t.amount || 0).toFixed(2)}</td>
+        <td class="text-gray-400">${esc(t.description || '-')}</td>
+        <td><span class="px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400">${esc(t.status || 'completed')}</span></td>
+      </tr>`).join('');
+    }
+  } catch (e) { console.error('Billing load error:', e); }
+}
 
-      document.getElementById('pageTitle').textContent = page.title;
-      document.getElementById('balanceDisplay').textContent = '$' + (state.user.balance || 0).toFixed(2);
-      document.getElementById('tierBadge').innerHTML = `<span class="badge badge-blue">${esc(state.user.tier)}</span>`;
-      document.getElementById('userInfo').innerHTML = `<div>${esc(state.user.email)}</div><div class="text-xs">${esc(state.user.tier)} tier</div>`;
+// Pricing Table
+async function loadPricingTable() {
+  try {
+    const data = await api('/api/pricing');
+    const models = data.models || data.pricing || data || [];
+    const tbody = document.getElementById('pricingTable');
+    if (Array.isArray(models) && models.length > 0) {
+      tbody.innerHTML = models.map(m => `<tr>
+        <td class="text-white font-medium">${esc(m.model || m.id || m.name)}</td>
+        <td class="text-gray-400">${esc(m.provider || '-')}</td>
+        <td>$${Number(m.input_price || m.prompt_price || m.pricing?.prompt || 0).toFixed(2)}</td>
+        <td>$${Number(m.output_price || m.completion_price || m.pricing?.completion || 0).toFixed(2)}</td>
+      </tr>`).join('');
+    } else {
+      tbody.innerHTML = getDefaultPricingRows();
+    }
+  } catch (e) {
+    document.getElementById('pricingTable').innerHTML = getDefaultPricingRows();
+  }
+}
 
-      document.querySelectorAll('.nav-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.page === hash);
+function getDefaultPricingRows() {
+  const models = [
+    { name: 'GPT-4o', provider: 'OpenAI', input: 2.50, output: 10.00 },
+    { name: 'GPT-4o Mini', provider: 'OpenAI', input: 0.15, output: 0.60 },
+    { name: 'GPT-4 Turbo', provider: 'OpenAI', input: 10.00, output: 30.00 },
+    { name: 'GPT-3.5 Turbo', provider: 'OpenAI', input: 0.50, output: 1.50 },
+    { name: 'Claude 3.5 Sonnet', provider: 'Anthropic', input: 3.00, output: 15.00 },
+    { name: 'Claude 3 Haiku', provider: 'Anthropic', input: 0.25, output: 1.25 },
+    { name: 'Gemini Pro', provider: 'Google', input: 0.50, output: 1.50 },
+    { name: 'Mistral Large', provider: 'Mistral', input: 4.00, output: 12.00 },
+    { name: 'Llama 3.1 70B', provider: 'Meta', input: 0.35, output: 0.40 },
+  ];
+  return models.map(m => `<tr><td class="text-white font-medium">${m.name}</td><td class="text-gray-400">${m.provider}</td><td>$${m.input.toFixed(2)}</td><td>$${m.output.toFixed(2)}</td></tr>`).join('');
+}
+
+async function handleUpgrade(plan) {
+  try {
+    await api('/api/pricing/upgrade', { method: 'POST', body: JSON.stringify({ plan }) });
+    showToast(`Upgraded to ${plan} plan!`, 'success');
+    await loadUser();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// Referral
+async function loadReferral() {
+  try {
+    const data = await api('/api/referral');
+    document.getElementById('refCode').textContent = esc(data.code || data.referral_code || 'N/A');
+    document.getElementById('refTotal').textContent = data.total_referrals ?? data.count ?? 0;
+    document.getElementById('refEarned').textContent = `$${Number(data.total_earned ?? data.earned ?? 0).toFixed(2)}`;
+    document.getElementById('refPending').textContent = data.pending ?? 0;
+  } catch (e) { console.error('Referral load error:', e); }
+}
+
+function copyReferralCode() {
+  const code = document.getElementById('refCode').textContent;
+  copyToClipboard(code);
+}
+
+// Settings
+function loadSettings() {
+  if (!currentUser) return;
+  document.getElementById('settingsName').value = currentUser.name || '';
+  document.getElementById('settingsEmail').value = currentUser.email || '';
+  document.getElementById('settingsId').value = currentUser.id || '';
+  document.getElementById('settingsCreated').value = formatDate(currentUser.created_at || currentUser.createdAt);
+  document.getElementById('settingsBaseUrl').textContent = API_BASE;
+  document.getElementById('settingsPlan').textContent = currentUser.plan || 'Free';
+  document.getElementById('docsBaseUrl').textContent = API_BASE;
+}
+
+// ===== PLAYGROUND =====
+let chatHistory = [];
+
+function clearPlayground() {
+  chatHistory = [];
+  document.getElementById('chatMessages').innerHTML = `<div class="text-center text-gray-500 py-20">
+    <svg class="w-12 h-12 text-gray-700 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    <p class="text-sm">Send a message to start chatting</p>
+  </div>`;
+  document.getElementById('pgCost').textContent = '$0.0000';
+}
+
+function updatePlaygroundCost() {
+  const model = document.getElementById('pgModel').value;
+  const rates = {
+    'gpt-4o': 0.0025, 'gpt-4o-mini': 0.00015, 'gpt-4-turbo': 0.01, 'gpt-3.5-turbo': 0.0005,
+    'claude-3.5-sonnet': 0.003, 'claude-3-haiku': 0.00025, 'gemini-pro': 0.0005,
+    'mistral-large': 0.004, 'llama-3.1-70b': 0.00035
+  };
+  const rate = rates[model] || 0.001;
+  document.getElementById('pgCost').textContent = `~$${(rate * 1).toFixed(4)}/req`;
+}
+
+async function sendPlaygroundMessage(e) {
+  e.preventDefault();
+  if (isStreaming) return;
+  const input = document.getElementById('pgInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  // Add user message
+  chatHistory.push({ role: 'user', content: msg });
+  appendChatBubble('user', msg);
+
+  // Build messages
+  const system = document.getElementById('pgSystem').value.trim();
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push(...chatHistory);
+
+  const model = document.getElementById('pgModel').value;
+  const temperature = parseFloat(document.getElementById('pgTemp').value);
+  const maxTokens = parseInt(document.getElementById('pgMaxTokens').value);
+  const stream = document.getElementById('pgStream').checked;
+
+  // Add assistant placeholder
+  const assistantEl = appendChatBubble('assistant', '');
+  assistantEl.innerHTML = '<span class="inline-flex gap-1"><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay:.2s"></span></span>';
+
+  isStreaming = true;
+  document.getElementById('pgSendBtn').disabled = true;
+
+  try {
+    if (stream) {
+      const response = await fetch(`${API_BASE}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens, stream: true })
       });
 
-      try {
-        document.getElementById('app').innerHTML = '<div class="text-center py-20"><div class="animate-spin text-3xl">⏳</div></div>';
-        document.getElementById('app').innerHTML = await page.fn();
-      } catch(e) {
-        document.getElementById('app').innerHTML = `<div class="text-center py-20 text-red-400">Error: ${esc(e.message)}</div>`;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error?.message || errData.error || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let buffer = '';
+
+      assistantEl.innerHTML = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullText += delta;
+              assistantEl.textContent = fullText;
+              scrollChatToBottom();
+            }
+          } catch {}
+        }
+      }
+      chatHistory.push({ role: 'assistant', content: fullText });
+    } else {
+      const data = await api('/v1/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens, stream: false })
+      });
+      const reply = data.choices?.[0]?.message?.content || 'No response';
+      assistantEl.textContent = reply;
+      chatHistory.push({ role: 'assistant', content: reply });
+
+      // Show cost
+      if (data.usage) {
+        const totalTokens = (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
+        const rates = { 'gpt-4o': 0.005, 'gpt-4o-mini': 0.0003, 'gpt-4-turbo': 0.03, 'gpt-3.5-turbo': 0.001, 'claude-3.5-sonnet': 0.006, 'claude-3-haiku': 0.0005, 'gemini-pro': 0.001, 'mistral-large': 0.008, 'llama-3.1-70b': 0.0007 };
+        const cost = (totalTokens / 1000) * (rates[model] || 0.002);
+        document.getElementById('pgCost').textContent = `$${cost.toFixed(4)}`;
       }
     }
+  } catch (e) {
+    assistantEl.innerHTML = `<span class="text-red-400">Error: ${esc(e.message)}</span>`;
+    showToast(e.message, 'error');
+  }
 
-    function renderApp() { renderRoute(); }
-    window.addEventListener('hashchange', renderRoute);
+  isStreaming = false;
+  document.getElementById('pgSendBtn').disabled = false;
+  scrollChatToBottom();
+}
 
-    // INIT
-    checkAuth();
-    renderApp();
-  </script>
+function appendChatBubble(role, content) {
+  const container = document.getElementById('chatMessages');
+  // Remove empty state if present
+  const emptyState = container.querySelector('.text-center');
+  if (emptyState && chatHistory.length <= 1) emptyState.remove();
+
+  const div = document.createElement('div');
+  div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-3 animate-fade-in`;
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role === 'user' ? 'chat-bubble-user' : 'chat-bubble-assistant'}`;
+  bubble.textContent = content;
+  div.appendChild(bubble);
+  container.appendChild(div);
+  scrollChatToBottom();
+  return bubble;
+}
+
+function scrollChatToBottom() {
+  const c = document.getElementById('chatMessages');
+  c.scrollTop = c.scrollHeight;
+}
+
+// ===== UTILS =====
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return '-'; }
+}
+
+function toggleEndpoint(el) {
+  // Could expand to show details; for now just visual feedback
+  el.classList.toggle('bg-gray-800/50');
+}
+
+// ===== INIT =====
+async function init() {
+  const hash = window.location.hash.slice(1);
+  if (token) {
+    try {
+      await loadUser();
+      showPage(hash || 'dashboard');
+    } catch {
+      token = null;
+      localStorage.removeItem('wn_token');
+      showPage('landing');
+    }
+  } else {
+    if (hash && ['login', 'register'].includes(hash)) {
+      showPage(hash);
+    } else {
+      showPage('landing');
+    }
+  }
+}
+
+window.addEventListener('popstate', (e) => {
+  const page = e.state?.page || window.location.hash.slice(1) || 'dashboard';
+  if (token) showPage(page);
+  else showPage('landing');
+});
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
 </body>
 </html>
