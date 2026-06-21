@@ -3,11 +3,13 @@ import { dbGet, dbRun } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { v4 as uuidv4 } from "uuid";
 import midtransClient from "midtrans-client";
+import { createHash } from "crypto";
+import { config } from "../config.js";
 
 const midtrans = new Hono();
 midtrans.use("*", authMiddleware);
 
-// POST /api/billing/midtrans/create — create Snap transaction
+// POST /api/midtrans/create — create Snap transaction
 midtrans.post("/create", async (c) => {
   const user = c.get("user");
   const body = await c.req.json().catch(() => ({}));
@@ -16,9 +18,13 @@ midtrans.post("/create", async (c) => {
     return c.json({ error: { message: "Minimum top-up Rp1.000" } }, 400);
   }
 
+  if (!config.midtransServerKey) {
+    return c.json({ error: { message: "Payment gateway not configured" } }, 503);
+  }
+
   const snap = new midtransClient.Snap({
-    isProduction: false,
-    serverKey: process.env.MIDTRANS_SERVER_KEY || "SB-Mid-server-xxx",
+    isProduction: config.midtransIsProduction,
+    serverKey: config.midtransServerKey,
   });
 
   const orderId = `webnesti-${Date.now()}-${uuidv4().slice(0, 8)}`;
@@ -34,11 +40,10 @@ midtrans.post("/create", async (c) => {
         first_name: user.name || "User",
       },
       callbacks: {
-        finish: `http://localhost:${process.env.PORT || 2019}/dashboard/billing`,
+        finish: `http://localhost:${config.port}/dashboard/billing`,
       },
     });
 
-    // Store pending transaction
     dbRun("INSERT INTO billing_transactions (id, user_id, type, amount, description) VALUES (?, ?, ?, ?, ?)",
       [orderId, user.id, "midtrans_pending", amount, `Midtrans top-up Rp${amount.toLocaleString()}`]);
 
@@ -49,17 +54,32 @@ midtrans.post("/create", async (c) => {
       amount,
     });
   } catch (err: any) {
-    return c.json({ error: { message: err.message || "Midtrans error" } }, 502);
+    console.error("[midtrans] Create error:", err);
+    return c.json({ error: { message: "Payment gateway error. Please try again." } }, 502);
   }
 });
 
-// POST /api/billing/midtrans/callback — Midtrans notification callback
+// POST /api/midtrans/callback — Midtrans notification callback with signature verification
 midtrans.post("/callback", async (c) => {
   const body = await c.req.json().catch(() => ({}));
 
+  if (!config.midtransServerKey) {
+    return c.json({ error: "Server configuration error" }, 500);
+  }
+
+  // Verify signature: SHA512(order_id + status_code + gross_amount + serverKey)
+  const expectedSignature = createHash("sha512")
+    .update(`${body.order_id}${body.status_code}${body.gross_amount}${config.midtransServerKey}`)
+    .digest("hex");
+
+  if (body.signature_key !== expectedSignature) {
+    console.error("[midtrans] Invalid signature for order:", body.order_id);
+    return c.json({ error: "Invalid signature" }, 403);
+  }
+
   const snap = new midtransClient.Snap({
-    isProduction: false,
-    serverKey: process.env.MIDTRANS_SERVER_KEY || "SB-Mid-server-xxx",
+    isProduction: config.midtransIsProduction,
+    serverKey: config.midtransServerKey,
   });
 
   try {
@@ -70,12 +90,9 @@ midtrans.post("/callback", async (c) => {
 
     if (transactionStatus === "capture" || transactionStatus === "settlement") {
       if (fraudStatus === "accept") {
-        // Find the pending transaction
         const tx = dbGet("SELECT * FROM billing_transactions WHERE id = ?", [orderId]);
         if (tx && tx.type === "midtrans_pending") {
-          // Credit user balance
           dbRun("UPDATE users SET balance = balance + ? WHERE id = ?", [tx.amount, tx.user_id]);
-          // Update transaction status
           dbRun("UPDATE billing_transactions SET type = 'midtrans_settled', description = ? WHERE id = ?",
             [`Midtrans settled Rp${tx.amount.toLocaleString()}`, orderId]);
         }
@@ -84,7 +101,8 @@ midtrans.post("/callback", async (c) => {
 
     return c.json({ status: "ok", order_id: orderId, transaction_status: transactionStatus });
   } catch (err: any) {
-    return c.json({ error: { message: err.message || "Callback error" } }, 500);
+    console.error("[midtrans] Callback error:", err.message);
+    return c.json({ error: "Callback processing error" }, 500);
   }
 });
 

@@ -1,10 +1,12 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { readFileSync, existsSync } from "fs";
+import { secureHeaders } from "hono/secure-headers";
+import { existsSync } from "fs";
+import { readFile } from "fs/promises";
 import { join } from "path";
 import { config } from "./config.js";
-import { getDb } from "./db/index.js";
+import { getDb, saveDb } from "./db/index.js";
 import { initProviders } from "./providers/index.js";
 import { cleanupBuckets } from "./middleware/rateLimit.js";
 import { AppError } from "./errors.js";
@@ -22,8 +24,13 @@ import { generateOpenAPISpec } from "./routes/docs.js";
 
 const app = new Hono();
 
-// Middleware
-app.use("*", cors());
+// Security headers
+app.use("*", secureHeaders());
+
+// CORS — restrict to configured origins
+app.use("*", cors({ origin: config.corsOrigins }));
+
+// Response time + powered-by
 app.use("*", async (c, next) => {
   const start = Date.now();
   await next();
@@ -31,7 +38,7 @@ app.use("*", async (c, next) => {
   c.header("X-Powered-By", "WebNesti");
 });
 
-// Error handler
+// Error handler — never leak internals
 app.onError((err, c) => {
   if (err instanceof AppError) {
     return c.json({ error: { message: err.message, type: err.code || "error" } }, err.status);
@@ -46,7 +53,7 @@ app.get("/health", async (c) => {
   const models = dbAll("SELECT COUNT(*) as count FROM models WHERE is_active = 1");
   const users = dbAll("SELECT COUNT(*) as count FROM users");
   return c.json({
-    status: "ok", server: "webnesti-api", version: "0.6.0",
+    status: "ok", server: "webnesti-api", version: "0.7.0",
     models: models[0]?.count || 0, users: users[0]?.count || 0,
     uptime: Math.round(process.uptime()),
   });
@@ -93,7 +100,7 @@ app.get("/*", async (c) => {
   const filePath = join(PUBLIC_DIR, path === "/" ? "index.html" : path);
   if (existsSync(filePath) && !filePath.endsWith("/")) {
     try {
-      const content = readFileSync(filePath);
+      const content = await readFile(filePath);
       const ext = filePath.slice(filePath.lastIndexOf("."));
       const mime = MIME[ext] || "application/octet-stream";
       c.header("Content-Type", mime);
@@ -105,7 +112,8 @@ app.get("/*", async (c) => {
   if (existsSync(indexPath)) {
     c.header("Content-Type", "text/html; charset=utf-8");
     c.header("Cache-Control", "no-cache");
-    return c.body(readFileSync(indexPath));
+    const content = await readFile(indexPath);
+    return c.body(content);
   }
   return c.json({ error: { message: "Frontend not found", type: "not_found" } }, 404);
 });
@@ -115,18 +123,29 @@ async function main() {
   await getDb();
   initProviders();
 
-  // Periodically evict stale rate-limit buckets so the in-memory map cannot grow
-  // unbounded (one entry per API key) and exhaust memory.
+  // Periodically evict stale rate-limit buckets
   setInterval(() => cleanupBuckets(), 60_000).unref();
 
-  serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
-    console.log(`[webnesti v0.6.0] http://${config.host}:${info.port}`);
+  const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
+    console.log(`[webnesti v0.7.0] http://${config.host}:${info.port}`);
     console.log(`[webnesti] Frontend: http://localhost:${info.port}/`);
     console.log(`[webnesti] API: http://localhost:${info.port}/v1/models`);
     console.log(`[webnesti] OpenAPI: http://localhost:${info.port}/v1/openapi.json`);
-    console.log(`[webnesti] Pricing: http://localhost:${info.port}/api/pricing`);
-    console.log(`[webnesti] Calculator: http://localhost:${info.port}/api/calculate?model=openai/gpt-4o`);
   });
+
+  // Graceful shutdown
+  function shutdown(signal: string) {
+    console.log(`[webnesti] Received ${signal}, shutting down...`);
+    saveDb();
+    server.close(() => {
+      console.log("[webnesti] Server closed");
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10_000);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 main().catch((err) => { console.error("Fatal:", err); process.exit(1); });

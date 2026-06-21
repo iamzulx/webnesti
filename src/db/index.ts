@@ -139,6 +139,18 @@ export async function getDb(): Promise<Database> {
     )
   `);
 
+  // Performance indexes
+  db.run(`CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_usage_logs_user_id ON usage_logs(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_usage_logs_model_id ON usage_logs(model_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_billing_transactions_user_id ON billing_transactions(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_referrals_user_id ON referrals(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_referral_uses_referrer_id ON referral_uses(referrer_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_byok_keys_user_id ON byok_keys(user_id)`);
+
   saveDb();
   return db;
 }

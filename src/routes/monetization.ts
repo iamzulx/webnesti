@@ -115,6 +115,22 @@ monetization.post("/referral/apply", async (c) => {
   const existing = dbGet("SELECT id FROM referral_uses WHERE referred_id = ?", [user.id]);
   if (existing) return c.json({ error: "Already used a referral code" }, 409);
 
+  // User must have at least 1 API request before applying referral
+  const usageCount = dbGet("SELECT COUNT(*) as count FROM usage_logs WHERE user_id = ?", [user.id]);
+  if (!usageCount || usageCount.count < 1) {
+    return c.json({ error: "You must make at least 1 API request before applying a referral code" }, 400);
+  }
+
+  // User account must be > 24 hours old
+  const userAge = dbGet("SELECT created_at FROM users WHERE id = ?", [user.id]);
+  if (userAge) {
+    const createdAt = new Date(userAge.created_at).getTime();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    if (Date.now() - createdAt < twentyFourHours) {
+      return c.json({ error: "Account must be at least 24 hours old to apply a referral code" }, 400);
+    }
+  }
+
   // Find referrer
   const referral = dbGet("SELECT * FROM referrals WHERE code = ?", [code]);
   if (!referral) return c.json({ error: "Invalid referral code" }, 404);

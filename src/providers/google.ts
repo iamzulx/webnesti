@@ -6,12 +6,14 @@ export class GoogleProvider implements Provider {
   id = "google";
   name = "Google";
   private genAI: GoogleGenerativeAI;
+  private apiKey: string;
 
   constructor(apiKey: string) {
+    this.apiKey = apiKey;
     this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
-  isAvailable(): boolean { return !!this.genAI; }
+  isAvailable(): boolean { return !!this.apiKey; }
 
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);

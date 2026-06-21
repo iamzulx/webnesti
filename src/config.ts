@@ -10,8 +10,6 @@ const INSECURE_JWT_SECRETS = new Set([
 
 const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
-// Never allow a missing/placeholder JWT secret to be used in production: an
-// attacker who knows the default value can forge session tokens for any user.
 if (isProduction && (INSECURE_JWT_SECRETS.has(jwtSecret) || jwtSecret.length < 32)) {
   throw new Error(
     "JWT_SECRET must be set to a strong, random value (>= 32 chars) in production."
@@ -24,6 +22,10 @@ export const config = {
   host: process.env.HOST || "0.0.0.0",
   jwtSecret,
   defaultMarkup: parseFloat(process.env.DEFAULT_MARKUP_PERCENT || "10"),
+  midtransServerKey: process.env.MIDTRANS_SERVER_KEY || "",
+  midtransIsProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  encryptionKey: process.env.ENCRYPTION_KEY || "dev-encryption-key-change-me-32b!!",
+  corsOrigins: process.env.CORS_ORIGINS?.split(",").map(s => s.trim()) || ["https://webnesti.ai", "http://localhost:3000"],
   providers: {
     openai: { apiKey: process.env.OPENAI_API_KEY || "" },
     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY || "" },
