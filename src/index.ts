@@ -16,6 +16,7 @@ import { cleanupBuckets } from "./middleware/rateLimit.js";
 import { AppError } from "./errors.js";
 import chatRoutes from "./routes/chat.js";
 import modelsRoutes from "./routes/models.js";
+import statusRoutes from "./routes/status.js";
 import keysRoutes from "./routes/keys.js";
 import authRoutes from "./routes/auth.js";
 import billingRoutes from "./routes/billing.js";
@@ -83,6 +84,7 @@ app.get("/v1/openapi.json", (c) => {
 // API routes
 app.route("/v1/chat", chatRoutes);
 app.route("/v1/models", modelsRoutes);
+app.route("/v1/status", statusRoutes);
 app.route("/api/keys", keysRoutes);
 app.route("/api/auth", authRoutes);
 app.route("/api/billing", billingRoutes);

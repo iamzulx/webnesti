@@ -52,4 +52,44 @@ test().catch(e => { console.error(e); process.exit(1); });
 " 2>&1 | grep -v "^\[db\]"
 
 echo ""
+echo "4. Aggregator endpoint tests (/v1/status, /v1/models filter)..."
+node --import tsx -e "
+import { getDb } from './src/db/index.js';
+import { serve } from '@hono/node-server';
+import { Hono } from 'hono';
+import modelsRoutes from './src/routes/models.js';
+import statusRoutes from './src/routes/status.js';
+
+async function test() {
+  await getDb();
+  const app = new Hono();
+  app.route('/v1/models', modelsRoutes);
+  app.route('/v1/status', statusRoutes);
+  const server = serve({ fetch: app.fetch, port: 18998 }, async () => {
+    let ok = 0, fail = 0;
+    const check = (name, cond) => { if (cond) { ok++; console.log('  ✅ ' + name); } else { fail++; console.log('  ❌ ' + name); } };
+
+    const status = await (await fetch('http://localhost:18998/v1/status')).json();
+    check('/v1/status has summary + providers array', status.object === 'status' && Array.isArray(status.providers));
+
+    const all = await (await fetch('http://localhost:18998/v1/models')).json();
+    check('/v1/models returns list', all.object === 'list' && all.data.length > 0);
+    check('/v1/models normalizes pricing to \$/1M', typeof all.data[0].pricing.prompt_per_million === 'number');
+
+    const anthro = await (await fetch('http://localhost:18998/v1/models?providers=anthropic')).json();
+    check('?providers= filters by provider', anthro.data.every(m => m.owned_by === 'anthropic') && anthro.data.length < all.data.length);
+
+    const sorted = await (await fetch('http://localhost:18998/v1/models?sort=pricing-low-to-high')).json();
+    const prices = sorted.data.map(m => m.pricing.prompt_per_million);
+    check('?sort=pricing-low-to-high is ascending', prices.every((p, i) => i === 0 || prices[i-1] <= p));
+
+    console.log('\\n  ' + ok + ' passed, ' + fail + ' failed');
+    server.close();
+    process.exit(fail > 0 ? 1 : 0);
+  });
+}
+test().catch(e => { console.error(e); process.exit(1); });
+" 2>&1 | grep -v "^\[db\]"
+
+echo ""
 echo "=== All tests complete ==="

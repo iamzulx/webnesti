@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { bodyLimit } from "hono/body-limit";
 import { getProviderForModel, getProviderMap, createProviderInstance } from "../providers/index.js";
+import type { Provider } from "../providers/types.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimitMiddleware } from "../middleware/rateLimit.js";
 import { dbGet, dbRun } from "../db/index.js";
 import { config } from "../config.js";
 import { resolveModel } from "../routing/router.js";
-import { executeWithFallback } from "../routing/fallback.js";
 import { recordRequest } from "../routing/strategies.js";
 import { decryptSecret } from "../encryption.js";
 import { inc } from "../metrics.js";
@@ -86,6 +86,19 @@ function validateBody(body: any): ValidationResult {
     return { ok: false, status: 400, message: "stream must be a boolean" };
   }
 
+  // Optional multi-model fallback list (OpenRouter-style): try each model in
+  // order until one succeeds. Non-streaming only.
+  if (body.models !== undefined) {
+    if (!Array.isArray(body.models) || body.models.length > 10) {
+      return { ok: false, status: 400, message: "models must be an array of at most 10 model ids" };
+    }
+    for (const m of body.models) {
+      if (typeof m !== "string" || m.length === 0 || m.length > 256) {
+        return { ok: false, status: 400, message: "each models[] entry must be a non-empty string" };
+      }
+    }
+  }
+
   return { ok: true, promptChars };
 }
 
@@ -107,6 +120,61 @@ function deductBalance(userId: string, cost: number): boolean {
   return true;
 }
 
+interface PreparedModel {
+  provider: Provider;       // BYOK-swapped instance when applicable
+  rawModelId: string;
+  modelId: string;          // catalog id (for pricing/billing/logging)
+  priceIn: number;
+  priceOut: number;
+  markup: number;
+  usingByok: boolean;
+}
+
+// Resolve a catalog model id into an executable provider + pricing, applying
+// BYOK if the user registered their own key. Returns null when the model isn't
+// in the active catalog (caller decides 404 vs trying the next fallback model).
+// Centralizing this fixes a prior bug where non-streaming requests billed with
+// BYOK markup (0%) while still executing against the platform key.
+function prepareModel(modelId: string, userId: string): PreparedModel | null {
+  const modelRow = dbGet("SELECT * FROM models WHERE id = ? AND is_active = 1", [modelId]);
+  if (!modelRow) return null;
+
+  const providers = getProviderMap();
+  const routed = resolveModel(modelId, providers, "balanced");
+  let provider: Provider, rawModelId: string;
+  if (routed) {
+    provider = routed.provider;
+    rawModelId = routed.rawModelId;
+  } else {
+    const direct = getProviderForModel(modelId);
+    if (!direct) return null;
+    provider = direct.provider;
+    rawModelId = direct.rawModelId;
+  }
+
+  // BYOK: swap to a per-request instance built from the user's encrypted key.
+  let usingByok = false;
+  try {
+    const byok = dbGet("SELECT key_hash FROM byok_keys WHERE user_id = ? AND provider = ? LIMIT 1", [userId, provider.id]);
+    if (byok?.key_hash) {
+      const byokProvider = createProviderInstance(provider.id, decryptSecret(byok.key_hash));
+      if (byokProvider) { provider = byokProvider; usingByok = true; }
+    }
+  } catch (err: any) {
+    logger.warn("BYOK key decrypt failed", { provider: provider.id, error: err?.message });
+  }
+
+  return {
+    provider,
+    rawModelId,
+    modelId,
+    priceIn: modelRow.pricing_input || 0,
+    priceOut: modelRow.pricing_output || 0,
+    markup: usingByok ? 1 : (1 + config.defaultMarkup / 100),
+    usingByok,
+  };
+}
+
 chat.post("/completions", async (c) => {
   const user = c.get("user");
   const apiKey = c.get("apiKey");
@@ -125,61 +193,20 @@ chat.post("/completions", async (c) => {
 
   const modelId = body.model;
 
-  // Only allow models that are registered AND active in our catalog. Without this,
-  // any model string on a loaded provider (e.g. an unlisted or deactivated model)
-  // would be forwarded with no pricing row — running at $0 cost and bypassing both
-  // the balance check and billing entirely.
-  const modelRow = dbGet("SELECT * FROM models WHERE id = ? AND is_active = 1", [modelId]);
-  if (!modelRow) {
+  // Resolve the primary model: catalog check + provider routing + BYOK + pricing.
+  // prepareModel returns null when the model isn't in the active catalog, which
+  // also blocks unlisted models from being forwarded at $0 cost.
+  const prepared = prepareModel(modelId, user.id);
+  if (!prepared) {
     return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
   }
-
-  // Resolve model → provider using the routing engine (supports fallback chains,
-  // aliases, and smart provider selection). Falls back to direct lookup if the
-  // routing engine can't resolve (e.g. model not in any provider's list).
-  const providers = getProviderMap();
-  const routed = resolveModel(modelId, providers, "balanced");
-
-  let provider, rawModelId: string;
-  if (routed) {
-    provider = routed.provider;
-    rawModelId = routed.rawModelId;
-  } else {
-    // Fallback to direct provider lookup (legacy path)
-    const direct = getProviderForModel(modelId);
-    if (!direct) {
-      return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
-    }
-    provider = direct.provider;
-    rawModelId = direct.rawModelId;
-  }
+  let { provider, rawModelId } = prepared;
+  const { priceIn, priceOut, markup } = prepared;
 
   const startTime = Date.now();
 
-  // BYOK: if the user registered their own key for this provider, use it with
-  // 0% markup. The stored key is AES-256-GCM encrypted and decrypted per-request.
-  let usingByok = false;
-  try {
-    const byok = dbGet("SELECT key_hash FROM byok_keys WHERE user_id = ? AND provider = ? LIMIT 1", [user.id, provider.id]);
-    if (byok?.key_hash) {
-      const userKey = decryptSecret(byok.key_hash);
-      const byokProvider = createProviderInstance(provider.id, userKey);
-      if (byokProvider) {
-        provider = byokProvider;
-        usingByok = true;
-      }
-    }
-  } catch (err: any) {
-    logger.warn("BYOK key decrypt failed", { provider: provider.id, error: err?.message });
-  }
-
-  const priceIn = modelRow.pricing_input || 0;
-  const priceOut = modelRow.pricing_output || 0;
-
   // Estimate prompt tokens from messages (rough: ~1 token per 4 chars).
   const estimatedPromptTokens = Math.ceil((validation.promptChars || 0) / 4);
-  // BYOK requests carry no platform markup (user pays the provider directly).
-  const markup = usingByok ? 1 : (1 + config.defaultMarkup / 100);
 
   inc("chat_requests_total", 1, { model: modelId, stream: body.stream ? "1" : "0" });
 
@@ -251,52 +278,61 @@ chat.post("/completions", async (c) => {
     });
   }
 
-  // Check balance BEFORE calling provider API (uses fresh balance).
-  const estimatedCost = estimatedPromptTokens * priceIn * markup;
-  if (estimatedCost > 0 && currentBalance(user.id) < estimatedCost) {
-    return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
+  // --- NON-STREAMING ---
+  // Multi-model fallback (OpenRouter-style): try body.model first, then each id
+  // in body.models[] until one succeeds. Each attempt uses THAT model's own
+  // provider (BYOK-swapped), pricing, and markup — so billing always matches the
+  // model that actually answered. Auth/transient errors move to the next model.
+  const candidateIds: string[] = [modelId, ...(Array.isArray(body.models) ? body.models : [])];
+  const tried: string[] = [];
+  let lastErr = "";
+
+  for (const candId of candidateIds) {
+    const pm = candId === modelId ? prepared : prepareModel(candId, user.id);
+    if (!pm) { lastErr = `Model '${candId}' not available`; continue; }
+    tried.push(candId);
+
+    // Balance gate per candidate (price differs across models).
+    const estCost = estimatedPromptTokens * pm.priceIn * pm.markup;
+    if (estCost > 0 && currentBalance(user.id) < estCost) {
+      return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
+    }
+
+    const attemptStart = Date.now();
+    try {
+      const res = await pm.provider.chat(body, pm.rawModelId);
+      const latency = Date.now() - startTime;
+      recordRequest(pm.provider.id, Date.now() - attemptStart, true);
+
+      const cost = (res.usage.prompt_tokens * pm.priceIn + res.usage.completion_tokens * pm.priceOut) * pm.markup;
+      inc("tokens_total", res.usage.total_tokens, { model: pm.modelId });
+      logUsage(user.id, apiKey.id, pm.modelId, pm.provider.id,
+        res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens, cost, latency, 200, 0);
+
+      if (!deductBalance(user.id, cost)) {
+        return c.json({ error: { message: "Insufficient balance", type: "insufficient_balance" } }, 402);
+      }
+
+      return c.json({
+        ...res,
+        webnesti: {
+          cost_usd: Math.round(cost * 1000000) / 1000000,
+          latency_ms: latency,
+          provider: pm.provider.id,
+          model: pm.modelId,
+          fallback_attempts: tried.length > 1 ? tried.length : undefined,
+        },
+      });
+    } catch (err: any) {
+      lastErr = err?.message || "Provider error";
+      recordRequest(pm.provider.id, Date.now() - attemptStart, false);
+      logger.error("chat model attempt failed", { model: pm.modelId, provider: pm.provider.id, error: lastErr });
+      inc("chat_errors_total", 1, { model: pm.modelId, type: "non_stream" });
+      // try next candidate
+    }
   }
 
-  // --- NON-STREAMING (with fallback chain) ---
-  const fallbackResult = await executeWithFallback(
-    providers,
-    provider.id,
-    async (p) => p.chat(body, rawModelId)
-  );
-
-  const latency = Date.now() - startTime;
-
-  if (!fallbackResult.success) {
-    logger.error("chat all providers failed", { provider: provider.id, model: modelId, error: fallbackResult.error });
-    inc("chat_errors_total", 1, { model: modelId, type: "non_stream" });
-    return c.json({ error: { message: "Upstream provider error", type: "provider_error" } }, 502);
-  }
-
-  const res = fallbackResult.response;
-  const actualProviderId = fallbackResult.providerId;
-  const attempts = fallbackResult.attempts;
-
-  const cost = (res.usage.prompt_tokens * priceIn + res.usage.completion_tokens * priceOut) * markup;
-
-  inc("tokens_total", res.usage.total_tokens, { model: modelId });
-
-  logUsage(user.id, apiKey.id, modelId, actualProviderId,
-    res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens,
-    cost, latency, 200, 0);
-
-  if (!deductBalance(user.id, cost)) {
-    return c.json({ error: { message: "Insufficient balance", type: "insufficient_balance" } }, 402);
-  }
-
-  return c.json({
-    ...res,
-    webnesti: {
-      cost_usd: Math.round(cost * 1000000) / 1000000,
-      latency_ms: latency,
-      provider: actualProviderId,
-      fallback_attempts: attempts > 1 ? attempts : undefined,
-    },
-  });
+  return c.json({ error: { message: "All candidate models failed", type: "provider_error", detail: lastErr } }, 502);
 });
 
 function logUsage(userId: string, apiKeyId: string, modelId: string, providerId: string,

@@ -38,6 +38,13 @@ export function getMetrics(providerId: string): RoutingMetrics | undefined {
   return metrics.get(providerId);
 }
 
+// Snapshot of all tracked provider metrics, for the public status endpoint.
+export function getAllMetrics(): Record<string, RoutingMetrics> {
+  const out: Record<string, RoutingMetrics> = {};
+  for (const [id, m] of metrics) out[id] = { ...m };
+  return out;
+}
+
 // Round-robin counter
 let rrIndex = 0;
 
