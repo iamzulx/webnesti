@@ -66,7 +66,7 @@ export const ReferralApplySchema = z.object({
 
 export const ByokSchema = z.object({
   provider: z.string().min(1),
-  key: z.string().min(1),
+  api_key: z.string().min(1),
 });
 
 export type ChatRequestInput = z.infer<typeof ChatRequestSchema>;
