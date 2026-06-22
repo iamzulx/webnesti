@@ -422,7 +422,7 @@
     const provider = document.getElementById("byok-provider")?.value;
     const key = document.getElementById("byok-key")?.value;
     if (!provider || !key) { window.showToast("Select provider and enter key", "warning"); return; }
-    const res = await api("POST", "/api/byok", { provider, key });
+    const res = await api("POST", "/api/byok", { provider, api_key: key });
     const el = document.getElementById("byok-register-result");
     if (!res.error && res.registered) {
       window.showToast("BYOK key registered!", "success");
@@ -438,7 +438,7 @@
   window.removeByokKey = async function (id) {
     if (!confirm("Remove this BYOK key?")) return;
     const res = await api("DELETE", "/api/byok/" + id);
-    if (!res.error && res.removed) {
+    if (!res.error && (res.removed || res.deleted)) {
       window.showToast("BYOK key removed", "success");
       setTimeout(() => location.reload(), 500);
     }

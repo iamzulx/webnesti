@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 import type { FC } from "hono/jsx";
 
-interface BYOKKey { id: string; provider: string; key_prefix: string; created_at: string }
+interface BYOKKey { id: string; provider: string; key_prefix?: string; created_at: string }
 
 export const BYOKPage: FC<{ keys: BYOKKey[] }> = ({ keys }) => (
   <div>

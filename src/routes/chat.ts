@@ -120,6 +120,41 @@ function deductBalance(userId: string, cost: number): boolean {
   return true;
 }
 
+function creditBalance(userId: string, amount: number): void {
+  if (amount <= 0) return;
+  dbRun("UPDATE users SET balance = balance + ? WHERE id = ?", [amount, userId]);
+}
+
+function spentThisMonth(apiKeyId: string): number {
+  const row = dbGet("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM usage_logs WHERE api_key_id = ? AND created_at >= datetime('now', 'start of month')", [apiKeyId]);
+  return row?.total || 0;
+}
+
+function requestsToday(apiKeyId: string): number {
+  const row = dbGet("SELECT COUNT(*) AS total FROM usage_logs WHERE api_key_id = ? AND created_at >= datetime('now', '-1 day')", [apiKeyId]);
+  return row?.total || 0;
+}
+
+function enforceUsageCaps(apiKey: any, reserveCost: number): { ok: boolean; message?: string } {
+  if (apiKey.daily_limit && requestsToday(apiKey.id) >= apiKey.daily_limit) {
+    return { ok: false, message: "Daily request limit exceeded" };
+  }
+  if (apiKey.monthly_budget != null) {
+    const remaining = Number(apiKey.monthly_budget) - spentThisMonth(apiKey.id);
+    if (remaining < reserveCost) return { ok: false, message: "Monthly budget exceeded" };
+  }
+  return { ok: true };
+}
+
+function reserveCost(promptTokens: number, maxTokens: number | undefined, priceIn: number, priceOut: number, markup: number): number {
+  // Pre-authorize against worst-case requested output, not only prompt cost.
+  const outputCap = Math.min(
+    typeof maxTokens === "number" && Number.isFinite(maxTokens) ? maxTokens : config.defaultMaxOutputTokens,
+    config.defaultMaxOutputTokens,
+  );
+  return (promptTokens * priceIn + outputCap * priceOut) * markup;
+}
+
 interface PreparedModel {
   provider: Provider;       // BYOK-swapped instance when applicable
   rawModelId: string;
@@ -212,13 +247,13 @@ chat.post("/completions", async (c) => {
 
   if (body.stream) {
     // --- STREAMING ---
-    // Enforce balance BEFORE streaming. Require enough to cover at least the
-    // estimated prompt cost; without this a depleted account could stream freely.
-    const estimatedCost = estimatedPromptTokens * priceIn * markup;
-    if (priceIn > 0 && currentBalance(user.id) <= 0) {
-      return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
-    }
-    if (estimatedCost > 0 && currentBalance(user.id) < estimatedCost) {
+    // Reserve worst-case cost BEFORE streaming. Once SSE bytes are sent we cannot
+    // abort cleanly for billing failure, so reservation is mandatory. Final usage
+    // later refunds any unused reserve.
+    const reservedCost = reserveCost(estimatedPromptTokens, body.max_tokens, priceIn, priceOut, markup);
+    const cap = enforceUsageCaps(apiKey, reservedCost);
+    if (!cap.ok) return c.json({ error: { message: cap.message, type: "usage_limit_exceeded" } }, 402);
+    if (!deductBalance(user.id, reservedCost)) {
       return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
     }
 
@@ -272,8 +307,9 @@ chat.post("/completions", async (c) => {
 
       inc("tokens_total", totalTokens, { model: modelId });
 
-      // Deduct atomically; logs usage regardless of whether deduction succeeded.
-      deductBalance(user.id, cost);
+      // Reconcile the pre-stream reserve: refund unused amount. Never silently
+      // ignore billing failure after bytes were streamed.
+      if (reservedCost > cost) creditBalance(user.id, reservedCost - cost);
       logUsage(user.id, apiKey.id, modelId, actualProviderId, finalPromptTokens, completionTokens, totalTokens, cost, Date.now() - startTime, streamError ? 502 : 200, 1);
     });
   }
@@ -292,9 +328,12 @@ chat.post("/completions", async (c) => {
     if (!pm) { lastErr = `Model '${candId}' not available`; continue; }
     tried.push(candId);
 
-    // Balance gate per candidate (price differs across models).
-    const estCost = estimatedPromptTokens * pm.priceIn * pm.markup;
-    if (estCost > 0 && currentBalance(user.id) < estCost) {
+    // Balance/budget gate per candidate (price differs across models). Reserve
+    // worst-case output before the provider call to prevent cost-drain attacks.
+    const reservedCost = reserveCost(estimatedPromptTokens, body.max_tokens, pm.priceIn, pm.priceOut, pm.markup);
+    const cap = enforceUsageCaps(apiKey, reservedCost);
+    if (!cap.ok) return c.json({ error: { message: cap.message, type: "usage_limit_exceeded" } }, 402);
+    if (!deductBalance(user.id, reservedCost)) {
       return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
     }
 
@@ -309,9 +348,7 @@ chat.post("/completions", async (c) => {
       logUsage(user.id, apiKey.id, pm.modelId, pm.provider.id,
         res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens, cost, latency, 200, 0);
 
-      if (!deductBalance(user.id, cost)) {
-        return c.json({ error: { message: "Insufficient balance", type: "insufficient_balance" } }, 402);
-      }
+      if (reservedCost > cost) creditBalance(user.id, reservedCost - cost);
 
       return c.json({
         ...res,
@@ -325,6 +362,7 @@ chat.post("/completions", async (c) => {
       });
     } catch (err: any) {
       lastErr = err?.message || "Provider error";
+      creditBalance(user.id, reservedCost);
       recordRequest(pm.provider.id, Date.now() - attemptStart, false);
       logger.error("chat model attempt failed", { model: pm.modelId, provider: pm.provider.id, error: lastErr });
       inc("chat_errors_total", 1, { model: pm.modelId, type: "non_stream" });

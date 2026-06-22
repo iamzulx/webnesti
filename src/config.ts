@@ -31,6 +31,7 @@ export const config = {
   host: process.env.HOST || "0.0.0.0",
   jwtSecret,
   defaultMarkup: parseFloat(process.env.DEFAULT_MARKUP_PERCENT || "10"),
+  defaultMaxOutputTokens: parseInt(process.env.DEFAULT_MAX_OUTPUT_TOKENS || "4096", 10),
   midtransServerKey: process.env.MIDTRANS_SERVER_KEY || "",
   midtransIsProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
   encryptionKey,
