@@ -13,7 +13,7 @@ npm run dev
 ## Production Start
 
 ```bash
-cp .env.example .env
+cp .env.production.example .env.production
 npm install
 npm run build
 npm run start:prod
@@ -50,7 +50,7 @@ Client → Hono API → Provider Adapters → {OpenAI, Anthropic, Google, DeepSe
 ### Docker
 
 ```bash
-cp .env.example .env
+cp .env.production.example .env
 docker compose up --build -d
 ```
 
@@ -59,11 +59,24 @@ Data persists in the `webnesti-data` volume.
 ### Compiled production
 
 ```bash
-cp .env.example .env
+cp .env.production.example .env
 npm install
 npm run build
 npm run start:prod
 ```
+
+### Railway
+
+This repo includes `railway.json`. Railway will use the Dockerfile automatically.
+
+### Render
+
+This repo includes `render.yaml` with a persistent disk config.
+
+### GitHub Container Registry
+
+This repo includes `.github/workflows/deploy.yml`.  
+Set repository variable `ENABLE_IMAGE_PUSH=true` to push images to GHCR on `main` push.
 
 ## Notes
 
