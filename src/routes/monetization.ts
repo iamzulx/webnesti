@@ -104,7 +104,7 @@ monetization.get("/referral", (c) => {
 
   return c.json({
     code: referral.code,
-    referral_link: `https://webnesti.ai/signup?ref=${referral.code}`,
+    referral_link: `/views/auth?ref=${referral.code}`,
     referrals_count: count?.count || 0,
     total_earned: earned?.total || 0,
     reward_per_referral: 5, // $5 credit per referral

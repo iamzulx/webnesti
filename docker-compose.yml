@@ -1,28 +1,13 @@
-version: "3.8"
-
 services:
   webnesti:
     build: .
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-random-string}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-to-a-random-string-32b}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
-      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY:-}
+    env_file:
+      - .env
     volumes:
       - webnesti-data:/app/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 volumes:
   webnesti-data:
-    driver: local

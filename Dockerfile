@@ -1,32 +1,25 @@
-# Multi-stage build for WebNesti
-FROM node:20-alpine AS builder
-
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --only=production
+RUN npm ci --legacy-peer-deps
 
-FROM node:20-alpine AS runner
-
-WORKDIR /app
-
-# Runtime dependencies
-RUN apk add --no-cache tini
-
-COPY --from=builder /app/node_modules ./node_modules
-COPY package.json ./
-COPY src/ ./src/
-COPY public/ ./public/
-COPY scripts/ ./scripts/
+FROM deps AS build
 COPY tsconfig.json ./
+COPY src/ src/
+COPY public/ public/
+COPY scripts/ scripts/
+RUN mkdir -p data && npm run build
 
-# Create data directory
-RUN mkdir -p data
-
-EXPOSE 3000
-
+FROM node:22-alpine AS runtime
+WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOST=0.0.0.0
-
+RUN apk add --no-cache tini && mkdir -p data
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/scripts ./scripts
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:${PORT:-3000}/health >/dev/null || exit 1
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "--import", "tsx", "src/index.ts"]
+CMD ["npm", "run", "start:prod"]

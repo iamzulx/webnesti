@@ -247,7 +247,7 @@ views.get("/referral", (c) => {
     `);
     data = {
       code: referral?.code || "",
-      referral_link: referral?.code ? `https://webnesti.ai/signup?ref=${referral.code}` : "",
+      referral_link: referral?.code ? `/views/auth?ref=${referral.code}` : "",
       referrals_count: count?.count || 0,
       total_earned: earned?.total || 0,
       reward_per_referral: 5,

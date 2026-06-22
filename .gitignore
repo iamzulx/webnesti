@@ -1,8 +1,4 @@
 node_modules/
-data/*.db
-.env
-*.log
 dist/
-.next-cli-build/
-.next/
-data/*.db.tmp
+data/
+.env
