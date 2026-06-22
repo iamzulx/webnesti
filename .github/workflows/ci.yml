@@ -18,5 +18,7 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - name: Typecheck
         run: npm run typecheck
+      - name: Build
+        run: npm run build
       - name: Tests
         run: bash test.sh
