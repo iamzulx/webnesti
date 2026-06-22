@@ -219,7 +219,7 @@
     const inputEl = document.getElementById("calc-input");
     const outputEl = document.getElementById("calc-output");
     if (!modelEl || !inputEl || !outputEl) return;
-    const model = modelEl.value || "openai/gpt-4o";
+    const model = modelEl.value || "openai/gpt-5.5";
     const input = parseInt(inputEl.value) || 1000;
     const output = parseInt(outputEl.value) || 500;
     const res = await api("GET", "/api/calculate?model=" + encodeURIComponent(model) + "&input_tokens=" + input + "&output_tokens=" + output);

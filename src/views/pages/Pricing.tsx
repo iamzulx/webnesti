@@ -46,7 +46,7 @@ export const PricingPage: FC<{ tiers: TierData[]; currentTier: any }> = ({ tiers
       <h3 style="font-size:16px;font-weight:600;margin-bottom:16px">Cost Calculator</h3>
       <div style="display:grid;gap:12px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <input id="calc-model" placeholder="Model (e.g. openai/gpt-4o)" />
+          <input id="calc-model" placeholder="Model (e.g. openai/gpt-5.5)" />
           <input id="calc-input" type="number" placeholder="Input tokens" value="1000" />
           <input id="calc-output" type="number" placeholder="Output tokens" value="500" />
         </div>

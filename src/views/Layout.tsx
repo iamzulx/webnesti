@@ -41,25 +41,9 @@ export const Layout = ({ title = "WebNesti", activePage = "", user, children }: 
         <meta property="og:title" content={`${title} — WebNesti`} />
         <meta property="og:description" content="AI Model API Provider — 100+ models, one endpoint" />
         <meta property="og:type" content="website" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="/js/htmx.min.js"></script>
         <script src="/js/alpine.min.js" defer></script>
         <script src="/js/app.js"></script>
-        <script dangerouslySetInnerHTML={{ __html: `
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-      colors: {
-        accent: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' }
-      }
-    }
-  }
-}` }} />
         <style dangerouslySetInnerHTML={{ __html: `
 *{scrollbar-width:thin;scrollbar-color:#1f2937 transparent}
 body{font-family:'Inter',system-ui,sans-serif;background:#030712;color:#e5e7eb;overflow-x:hidden}

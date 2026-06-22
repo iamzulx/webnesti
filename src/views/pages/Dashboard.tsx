@@ -67,7 +67,7 @@ export const DashboardPage: FC<{ data: DashboardData }> = ({ data }) => (
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "openai/gpt-4o",
+    "model": "openai/gpt-5.5",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'`}
       </pre>
