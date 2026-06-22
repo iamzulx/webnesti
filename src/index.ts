@@ -92,6 +92,9 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+// Root redirect → dashboard
+app.get("/", (c) => c.redirect("/views/dashboard", 302));
+
 app.get("/favicon.ico", (c) => c.body(null, 204));
 
 app.get("/*", async (c) => {

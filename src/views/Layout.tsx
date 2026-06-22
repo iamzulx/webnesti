@@ -10,18 +10,21 @@ interface LayoutProps {
 
 export const Layout = ({ title = "WebNesti", activePage = "", user, children }: LayoutProps) => {
   const navItems = [
-    { id: "dashboard", icon: "📊", label: "Dashboard", href: "/views/dashboard" },
-    { id: "models", icon: "🤖", label: "Models", href: "/views/models" },
-    { id: "playground", icon: "💬", label: "Playground", href: "/views/playground" },
-    { id: "keys", icon: "🔑", label: "API Keys", href: "/views/keys" },
-    { id: "usage", icon: "📈", label: "Usage", href: "/views/usage" },
-    { id: "billing", icon: "💳", label: "Billing", href: "/views/billing" },
-    { id: "budget", icon: "🎯", label: "Budget", href: "/views/budget" },
-    { id: "pricing", icon: "💎", label: "Pricing", href: "/views/pricing" },
-    { id: "referral", icon: "🎁", label: "Referral", href: "/views/referral" },
-    { id: "byok", icon: "🗝️", label: "BYOK", href: "/views/byok" },
-    { id: "docs", icon: "📖", label: "API Docs", href: "/v1/openapi.json" },
+  { id: "dashboard", icon: "📊", label: "Dashboard", href: "/views/dashboard" },
+  { id: "models", icon: "🤖", label: "Models", href: "/views/models" },
+  { id: "playground", icon: "💬", label: "Playground", href: "/views/playground" },
+  { id: "keys", icon: "🔑", label: "API Keys", href: "/views/keys" },
+  { id: "usage", icon: "📈", label: "Usage", href: "/views/usage" },
+  { id: "billing", icon: "💳", label: "Billing", href: "/views/billing" },
+  { id: "budget", icon: "🎯", label: "Budget", href: "/views/budget" },
+  { id: "pricing", icon: "💎", label: "Pricing", href: "/views/pricing" },
+  { id: "referral", icon: "🎁", label: "Referral", href: "/views/referral" },
+  { id: "byok", icon: "🗝️", label: "BYOK", href: "/views/byok" },
+  { id: "auth", icon: "🔐", label: "Login", href: "/views/auth" },
   ];
+
+  // Don't render nav links as htmx for auth page (no sidebar context)
+  const isHtmxNav = (item: { href: string }) => !item.href.startsWith("/views/auth");
 
   return (
     <html lang="en" class="dark">
@@ -35,6 +38,7 @@ export const Layout = ({ title = "WebNesti", activePage = "", user, children }: 
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="/js/htmx.min.js"></script>
         <script src="/js/alpine.min.js" defer></script>
+        <script src="/js/app.js"></script>
         <script dangerouslySetInnerHTML={{ __html: `
 tailwind.config = {
   darkMode: 'class',
@@ -82,9 +86,6 @@ td{padding:12px 16px;border-bottom:1px solid #1f2937;font-size:14px}
                 <a
                   href={item.href}
                   class={`sidebar-link ${activePage === item.id ? "active" : ""}`}
-                  hx-get={item.href.startsWith("/views/") ? item.href : undefined}
-                  hx-target="#main-content"
-                  hx-push-url={item.href.startsWith("/views/") ? "true" : undefined}
                 >
                   <span>{item.icon}</span>
                   <span>{item.label}</span>
