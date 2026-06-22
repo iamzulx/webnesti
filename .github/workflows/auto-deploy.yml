@@ -1,0 +1,36 @@
+name: Auto Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy-railway:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.ENABLE_RAILWAY_DEPLOY == 'true' }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm install -g @railway/cli
+          railway link --yes --token "$RAILWAY_TOKEN"
+          railway up --service "${{ vars.RAILWAY_SERVICE_NAME || 'webnesti' }}" --detach
+
+  deploy-render:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.ENABLE_RENDER_DEPLOY == 'true' }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Deploy to Render via webhook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL is missing"
+            exit 1
+          fi
+          curl -fsSL -X POST "$RENDER_DEPLOY_HOOK_URL"
