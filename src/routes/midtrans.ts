@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import midtransClient from "midtrans-client";
 import { createHash } from "crypto";
 import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 const midtrans = new Hono();
 
@@ -59,7 +60,7 @@ midtrans.post("/create", authMiddleware, async (c) => {
       amount,
     });
   } catch (err: any) {
-    console.error("[midtrans] Create error:", err);
+    logger.error("midtrans create error", { error: err?.message });
     return c.json({ error: { message: "Payment gateway error. Please try again." } }, 502);
   }
 });
@@ -78,7 +79,7 @@ midtrans.post("/callback", async (c) => {
     .digest("hex");
 
   if (body.signature_key !== expectedSignature) {
-    console.error("[midtrans] Invalid signature for order:", body.order_id);
+    logger.warn("midtrans invalid signature", { order_id: body.order_id });
     return c.json({ error: "Invalid signature" }, 403);
   }
 
@@ -106,7 +107,7 @@ midtrans.post("/callback", async (c) => {
 
     return c.json({ status: "ok", order_id: orderId, transaction_status: transactionStatus });
   } catch (err: any) {
-    console.error("[midtrans] Callback error:", err.message);
+    logger.error("midtrans callback error", { error: err?.message });
     return c.json({ error: "Callback processing error" }, 500);
   }
 });

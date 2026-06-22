@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { dbAll, dbGet, dbRun } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getProviderMap } from "../providers/index.js";
+import { invalidateByTag } from "../cache.js";
 
 const admin = new Hono();
 
@@ -133,6 +134,9 @@ admin.put("/models/:id", async (c) => {
   if (pricing_output !== undefined) dbRun("UPDATE models SET pricing_output = ? WHERE id = ?", [pricing_output, modelId]);
   if (is_active !== undefined) dbRun("UPDATE models SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, modelId]);
   if (context_length !== undefined) dbRun("UPDATE models SET context_length = ? WHERE id = ?", [context_length, modelId]);
+
+  // Bust the /v1/models response cache so the change is visible immediately.
+  invalidateByTag("models");
 
   return c.json({ id: modelId, updated: true });
 });

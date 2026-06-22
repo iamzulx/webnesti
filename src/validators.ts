@@ -29,6 +29,25 @@ export const CreateKeySchema = z.object({
   daily_limit: z.number().int().min(1).max(1_000_000).optional(),
 });
 
+/**
+ * Per-tier hard caps for API key rate/daily limits. A user cannot create a key
+ * with limits above their tier's ceiling (prevents quota self-escalation).
+ * enterprise: 0 = unlimited.
+ */
+export const TIER_LIMITS: Record<string, { rateLimit: number; dailyLimit: number }> = {
+  free: { rateLimit: 20, dailyLimit: 1000 },
+  starter: { rateLimit: 60, dailyLimit: 10000 },
+  pro: { rateLimit: 300, dailyLimit: 100000 },
+  enterprise: { rateLimit: 100000, dailyLimit: 100000000 },
+};
+
+export function capToTier(tier: string, requested: { rateLimit?: number; dailyLimit?: number }): { rateLimit: number; dailyLimit: number } {
+  const caps = TIER_LIMITS[tier] || TIER_LIMITS.free;
+  const rateLimit = Math.min(requested.rateLimit ?? caps.rateLimit, caps.rateLimit);
+  const dailyLimit = Math.min(requested.dailyLimit ?? caps.dailyLimit, caps.dailyLimit);
+  return { rateLimit, dailyLimit };
+}
+
 export const TopUpSchema = z.object({
   amount: z.number().min(1000),
 });

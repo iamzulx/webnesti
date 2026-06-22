@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { generateApiKey, hashApiKey } from "../encryption.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { dbAll, dbGet, dbRun } from "../db/index.js";
+import { CreateKeySchema, capToTier } from "../validators.js";
 
 const keys = new Hono();
 keys.use("*", authMiddleware);
@@ -11,9 +12,21 @@ keys.use("*", authMiddleware);
 keys.post("/", async (c) => {
   const user = c.get("user");
   const body = await c.req.json().catch(() => ({}));
-  const name = body.name || "default";
-  const rateLimit = body.rate_limit || 60;
-  const dailyLimit = body.daily_limit || 10000;
+
+  // Validate input shape with Zod.
+  const parsed = CreateKeySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message || "Invalid request" }, 400);
+  }
+
+  const name = parsed.data.name || "default";
+
+  // Cap requested limits to the user's tier ceiling. Without this, a free-tier
+  // user could create a key with rate_limit: 999999 and bypass their tier quota.
+  const { rateLimit, dailyLimit } = capToTier(user.tier, {
+    rateLimit: parsed.data.rate_limit,
+    dailyLimit: parsed.data.daily_limit,
+  });
 
   const rawKey = generateApiKey();
   const keyHash = hashApiKey(rawKey);

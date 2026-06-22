@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { getDb, dbRun, dbGet } from "../src/db/index.js";
 
-async function seed() {
+export async function seed() {
   await getDb();
   console.log("[seed] Seeding models from official sources (June 2026)...");
 
@@ -151,7 +151,15 @@ async function seed() {
 
   console.log(`\n[seed] Done! ${providers.length} providers, ${models.length} models`);
   console.log("[seed] Sources: developers.openai.com, platform.claude.com, ai.google.dev");
-  process.exit(0);
+  return { providers: providers.length, models: models.length };
 }
 
-seed().catch((err) => { console.error("Seed failed:", err); process.exit(1); });
+// Only exit the process when run directly as a script (not when imported).
+import { fileURLToPath } from "url";
+import { argv } from "process";
+const isMain = argv[1] && fileURLToPath(import.meta.url) === argv[1];
+if (isMain) {
+  seed()
+    .then(() => process.exit(0))
+    .catch((err) => { console.error("Seed failed:", err); process.exit(1); });
+}

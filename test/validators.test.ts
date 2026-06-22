@@ -1,6 +1,6 @@
 import {
   ChatRequestSchema, RegisterSchema, LoginSchema,
-  CreateKeySchema, BudgetSchema, UpgradeSchema
+  CreateKeySchema, BudgetSchema, UpgradeSchema, capToTier
 } from "../src/validators.js";
 
 let passed = 0;
@@ -111,6 +111,27 @@ test("upgrade rejects invalid tier", () => {
 test("upgrade rejects enterprise (not self-serve)", () => {
   const result = UpgradeSchema.safeParse({ tier: "enterprise" });
   return result.success === false;
+});
+
+// capToTier — quota self-escalation guard
+test("capToTier caps free-tier key below requested limits", () => {
+  const r = capToTier("free", { rateLimit: 999999, dailyLimit: 999999999 });
+  return r.rateLimit === 20 && r.dailyLimit === 1000;
+});
+
+test("capToTier honors lower-than-ceiling requests", () => {
+  const r = capToTier("pro", { rateLimit: 10, dailyLimit: 500 });
+  return r.rateLimit === 10 && r.dailyLimit === 500;
+});
+
+test("capToTier falls back to free ceiling for unknown tier", () => {
+  const r = capToTier("bogus", { rateLimit: 999999, dailyLimit: 999999 });
+  return r.rateLimit === 20 && r.dailyLimit === 1000;
+});
+
+test("capToTier uses tier defaults when no limits requested", () => {
+  const r = capToTier("starter", {});
+  return r.rateLimit === 60 && r.dailyLimit === 10000;
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

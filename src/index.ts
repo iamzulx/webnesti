@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { existsSync } from "fs";
@@ -56,7 +57,7 @@ app.use("*", async (c, next) => {
 // Error handler — never leak internals
 app.onError((err, c) => {
   if (err instanceof AppError) {
-    return c.json({ error: { message: err.message, type: err.code || "error" } }, err.status);
+    return c.json({ error: { message: err.message, type: err.code || "error" } }, err.status as ContentfulStatusCode);
   }
   console.error("[error]", err);
   return c.json({ error: { message: "Internal server error", type: "server_error" } }, 500);
@@ -149,6 +150,23 @@ app.get("/*", async (c) => {
 // Start
 async function main() {
   await getDb();
+
+  // Auto-seed models/providers on first boot (empty DB). A fresh deploy with an
+  // empty volume would otherwise 404 every chat request until `npm run seed` is
+  // run manually. Idempotent — skipped when the catalog is already populated.
+  const { dbGet } = await import("./db/index.js");
+  const modelCount = dbGet("SELECT COUNT(*) as c FROM models WHERE is_active = 1")?.c || 0;
+  if (modelCount === 0) {
+    logger.info("Empty model catalog detected — auto-seeding");
+    try {
+      const { seed } = await import("../scripts/seed.js");
+      const result = await seed();
+      logger.info("Auto-seed complete", result);
+    } catch (err: any) {
+      logger.error("Auto-seed failed", { error: err?.message });
+    }
+  }
+
   initProviders();
 
   // Periodically evict stale rate-limit buckets

@@ -4,6 +4,7 @@ import { randomBytes, scryptSync, timingSafeEqual, createHash } from "crypto";
 import { parse, serialize } from "cookie";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
+import { RegisterSchema, LoginSchema } from "../validators.js";
 
 const auth = new Hono();
 
@@ -89,12 +90,11 @@ auth.post("/register", async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({}));
-  const { email, password, name } = body;
-
-  if (!email) return c.json({ error: "email required" }, 400);
-  if (typeof password !== "string" || password.length < 8) {
-    return c.json({ error: "password must be at least 8 characters" }, 400);
+  const parsed = RegisterSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message || "Invalid email or password" }, 400);
   }
+  const { email, password, name } = parsed.data;
 
   // Check if user already exists
   const existing = dbGet("SELECT id FROM users WHERE email = ?", [email]);
@@ -135,12 +135,11 @@ auth.post("/login", async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({}));
-  const { email, password } = body;
-
-  if (!email) return c.json({ error: "email required" }, 400);
-  if (typeof password !== "string" || !password) {
-    return c.json({ error: "password required" }, 400);
+  const parsed = LoginSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid email or password" }, 400);
   }
+  const { email, password } = parsed.data;
 
   const user = dbGet("SELECT * FROM users WHERE email = ?", [email]);
 

@@ -198,6 +198,7 @@ monetization.post("/byok", async (c) => {
   return c.json({
     id,
     provider,
+    registered: true,
     status: "active",
     message: "BYOK key registered. Requests using this provider will use your key (0% markup).",
   });
@@ -215,7 +216,7 @@ monetization.delete("/byok/:id", (c) => {
   const user = c.get("user");
   const keyId = c.req.param("id");
   dbRun("DELETE FROM byok_keys WHERE id = ? AND user_id = ?", [keyId, user.id]);
-  return c.json({ id: keyId, deleted: true });
+  return c.json({ id: keyId, deleted: true, removed: true });
 });
 
 // --- Cost Calculator ---

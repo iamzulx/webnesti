@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { bodyLimit } from "hono/body-limit";
-import { getProviderForModel, getProviderMap } from "../providers/index.js";
+import { getProviderForModel, getProviderMap, createProviderInstance } from "../providers/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimitMiddleware } from "../middleware/rateLimit.js";
 import { dbGet, dbRun } from "../db/index.js";
@@ -9,6 +9,9 @@ import { config } from "../config.js";
 import { resolveModel } from "../routing/router.js";
 import { executeWithFallback } from "../routing/fallback.js";
 import { recordRequest } from "../routing/strategies.js";
+import { decryptSecret } from "../encryption.js";
+import { inc } from "../metrics.js";
+import { logger } from "../logger.js";
 
 const chat = new Hono();
 
@@ -153,12 +156,32 @@ chat.post("/completions", async (c) => {
 
   const startTime = Date.now();
 
+  // BYOK: if the user registered their own key for this provider, use it with
+  // 0% markup. The stored key is AES-256-GCM encrypted and decrypted per-request.
+  let usingByok = false;
+  try {
+    const byok = dbGet("SELECT key_hash FROM byok_keys WHERE user_id = ? AND provider = ? LIMIT 1", [user.id, provider.id]);
+    if (byok?.key_hash) {
+      const userKey = decryptSecret(byok.key_hash);
+      const byokProvider = createProviderInstance(provider.id, userKey);
+      if (byokProvider) {
+        provider = byokProvider;
+        usingByok = true;
+      }
+    }
+  } catch (err: any) {
+    logger.warn("BYOK key decrypt failed", { provider: provider.id, error: err?.message });
+  }
+
   const priceIn = modelRow.pricing_input || 0;
   const priceOut = modelRow.pricing_output || 0;
 
   // Estimate prompt tokens from messages (rough: ~1 token per 4 chars).
   const estimatedPromptTokens = Math.ceil((validation.promptChars || 0) / 4);
-  const markup = 1 + config.defaultMarkup / 100;
+  // BYOK requests carry no platform markup (user pays the provider directly).
+  const markup = usingByok ? 1 : (1 + config.defaultMarkup / 100);
+
+  inc("chat_requests_total", 1, { model: modelId, stream: body.stream ? "1" : "0" });
 
   if (body.stream) {
     // --- STREAMING ---
@@ -205,7 +228,8 @@ chat.post("/completions", async (c) => {
         await s.write("data: [DONE]\n\n");
       } catch (err: any) {
         streamError = true;
-        console.error("[chat:stream] provider error", err);
+        logger.error("chat stream provider error", { provider: provider.id, model: modelId, error: err?.message });
+        inc("chat_errors_total", 1, { model: modelId, type: "stream" });
         recordRequest(provider.id, Date.now() - startTime, false);
         await s.write(`data: ${JSON.stringify({ error: { message: "Upstream provider error", type: "provider_error" } })}\n\n`);
       }
@@ -218,6 +242,8 @@ chat.post("/completions", async (c) => {
       const finalPromptTokens = usageReported ? promptTokens : estimatedPromptTokens;
       const totalTokens = finalPromptTokens + completionTokens;
       const cost = (finalPromptTokens * priceIn + completionTokens * priceOut) * markup;
+
+      inc("tokens_total", totalTokens, { model: modelId });
 
       // Deduct atomically; logs usage regardless of whether deduction succeeded.
       deductBalance(user.id, cost);
@@ -241,7 +267,8 @@ chat.post("/completions", async (c) => {
   const latency = Date.now() - startTime;
 
   if (!fallbackResult.success) {
-    console.error("[chat] all providers failed:", fallbackResult.error);
+    logger.error("chat all providers failed", { provider: provider.id, model: modelId, error: fallbackResult.error });
+    inc("chat_errors_total", 1, { model: modelId, type: "non_stream" });
     return c.json({ error: { message: "Upstream provider error", type: "provider_error" } }, 502);
   }
 
@@ -250,6 +277,8 @@ chat.post("/completions", async (c) => {
   const attempts = fallbackResult.attempts;
 
   const cost = (res.usage.prompt_tokens * priceIn + res.usage.completion_tokens * priceOut) * markup;
+
+  inc("tokens_total", res.usage.total_tokens, { model: modelId });
 
   logUsage(user.id, apiKey.id, modelId, actualProviderId,
     res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens,
@@ -278,7 +307,11 @@ function logUsage(userId: string, apiKeyId: string, modelId: string, providerId:
       "INSERT INTO usage_logs (user_id, api_key_id, model_id, provider_id, prompt_tokens, completion_tokens, total_tokens, cost_usd, latency_ms, status_code, is_stream) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [userId, apiKeyId, modelId, providerId, promptTokens, completionTokens, totalTokens, cost, latency, status, isStream]
     );
-  } catch {}
+  } catch (err: any) {
+    // Usage log failure must not break the request, but it should not be silent
+    // either — a lost insert means lost billing/usage data.
+    logger.error("usage log insert failed", { model: modelId, error: err?.message });
+  }
 }
 
 export default chat;

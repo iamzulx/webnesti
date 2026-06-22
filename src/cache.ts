@@ -2,6 +2,7 @@
  * Simple in-memory response cache with TTL and tag-based invalidation.
  * Used for caching expensive DB queries like model lists.
  */
+import { logger } from "./logger.js";
 
 interface CacheEntry<T> {
   value: T;
@@ -22,7 +23,7 @@ function startSweep() {
       if (entry.expiresAt < now) { cache.delete(key); swept++; }
     }
     if (swept > 0) {
-      console.error(`[cache] Swept ${swept} expired entries`);
+      logger.debug("cache swept expired entries", { count: swept });
     }
   }, 60_000).unref();
 }

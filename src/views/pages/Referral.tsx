@@ -57,7 +57,7 @@ export const ReferralPage: FC<{ data: ReferralData }> = ({ data }) => (
           <tbody>
             {data.leaderboard.map((u, i) => (
               <tr>
-                <td style="font-weight:700;color:{i === 0 ? '#fbbf24' : i === 1 ? '#9ca3af' : '#b45309'}">{i + 1}</td>
+                <td style={`font-weight:700;color:${i === 0 ? '#fbbf24' : i === 1 ? '#9ca3af' : '#b45309'}`}>{i + 1}</td>
                 <td>{u.name || 'Anonymous'}</td>
                 <td>{u.referrals}</td>
                 <td>${(u.earned || 0).toFixed(2)}</td>

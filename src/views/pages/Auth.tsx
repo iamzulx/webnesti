@@ -60,7 +60,7 @@ export const AuthPage: FC<AuthPageProps> = ({ message, error, mode = "login" }) 
           </div>
           <div style="margin-bottom:20px">
             <label style="font-size:12px;color:#9ca3af;margin-bottom:6px;display:block">Password</label>
-            <input name="password" type="password" placeholder="Min. 8 characters" required minlength="8" />
+            <input name="password" type="password" placeholder="Min. 8 characters" required minlength={8} />
           </div>
           <button class="btn-primary" style="width:100%;padding:12px" type="button"
             x-on:click="doRegister()">Create Account</button>

@@ -55,8 +55,9 @@ export class CohereProvider implements Provider {
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Cohere API error ${res.status}: ${err}`);
+      // Don't embed the raw upstream body in the error (it may end up in logs).
+      await res.text().catch(() => "");
+      throw new Error(`Cohere API error ${res.status}`);
     }
 
     const data = await res.json() as any;
@@ -95,8 +96,8 @@ export class CohereProvider implements Provider {
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Cohere API error ${res.status}: ${err}`);
+      await res.text().catch(() => "");
+      throw new Error(`Cohere API error ${res.status}`);
     }
 
     const id = randomUUID();

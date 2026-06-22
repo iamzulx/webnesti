@@ -9,6 +9,7 @@ import { MistralProvider } from "./mistral.js";
 import { CohereProvider } from "./cohere.js";
 import { OpenAICompatProvider } from "./openai-compat.js";
 import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 const providers = new Map<string, Provider>();
 
@@ -139,7 +140,7 @@ export function initProviders() {
     ]
   ));
 
-  console.log(`[providers] Loaded ${providers.size}: ${[...providers.keys()].join(", ") || "none (add API keys to .env)"}`);
+  logger.info("Providers loaded", { count: providers.size, providers: [...providers.keys()] });
 }
 
 export function getProviderForModel(modelId: string): { provider: Provider; rawModelId: string } | undefined {
@@ -162,3 +163,25 @@ export function getProviderForModel(modelId: string): { provider: Provider; rawM
 
 export function getAllProviders(): Provider[] { return [...providers.values()]; }
 export function getProviderMap(): Map<string, Provider> { return providers; }
+
+/**
+ * Build a fresh provider instance for a given provider id with a user-supplied
+ * API key (BYOK). Returns undefined for provider ids that aren't first-party
+ * (OpenAI-compatible providers are not yet supported for BYOK). The returned
+ * instance is NOT registered in the global map — it's used for a single request.
+ */
+export function createProviderInstance(providerId: string, apiKey: string): Provider | undefined {
+  if (!apiKey) return undefined;
+  switch (providerId) {
+    case "openai": return new OpenAIProvider(apiKey);
+    case "anthropic": return new AnthropicProvider(apiKey);
+    case "google": return new GoogleProvider(apiKey);
+    case "deepseek": return new DeepSeekProvider(apiKey);
+    case "meta": return new MetaProvider(apiKey);
+    case "xai": return new XAIProvider(apiKey);
+    case "mistral": return new MistralProvider(apiKey);
+    case "cohere": return new CohereProvider(apiKey);
+    default: return undefined;
+  }
+}
+
