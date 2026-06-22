@@ -7,6 +7,9 @@ import { readFile } from "fs/promises";
 import { join, resolve, sep } from "path";
 import { config } from "./config.js";
 import { getDb, saveDb } from "./db/index.js";
+import { logger } from "./logger.js";
+import { renderMetrics, setGauge } from "./metrics.js";
+import { getCache, setCache, invalidateByTag } from "./cache.js";
 import { initProviders } from "./providers/index.js";
 import { cleanupBuckets } from "./middleware/rateLimit.js";
 import { AppError } from "./errors.js";
@@ -31,12 +34,23 @@ app.use("*", secureHeaders());
 // CORS — restrict to configured origins
 app.use("*", cors({ origin: config.corsOrigins }));
 
-// Response time + powered-by
+// Metrics + logging middleware
 app.use("*", async (c, next) => {
   const start = Date.now();
+  const method = c.req.method;
+  const path = c.req.path;
   await next();
-  c.header("X-Response-Time", `${Date.now() - start}ms`);
+  const duration = Date.now() - start;
+  c.header("X-Response-Time", `${duration}ms`);
   c.header("X-Powered-By", "WebNesti");
+
+  // Skip logging for static assets and health checks
+  if (path === "/health" || path === "/metrics" || path.startsWith("/favicon")) return;
+  const status = c.res.status;
+  logger.debug(`${method} ${path} → ${status} ${duration}ms`);
+  const { inc } = await import("./metrics.js");
+  inc("http_requests_total", 1, { method, status: String(status) });
+  inc("http_request_duration_ms_total", duration, { method });
 });
 
 // Error handler — never leak internals
@@ -92,6 +106,12 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
+// Prometheus metrics
+app.get("/metrics", (c) => {
+  setGauge("webnesti_uptime_seconds", Math.round(process.uptime()));
+  return c.text(renderMetrics(), 200, { "Content-Type": "text/plain; version=0.0.4" });
+});
+
 // Root redirect → dashboard
 app.get("/", (c) => c.redirect("/views/dashboard", 302));
 
@@ -135,10 +155,10 @@ async function main() {
   setInterval(() => cleanupBuckets(), 60_000).unref();
 
   const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
-    console.log(`[webnesti v0.8.0] http://${config.host}:${info.port}`);
-    console.log(`[webnesti] Frontend: http://localhost:${info.port}/`);
-    console.log(`[webnesti] API: http://localhost:${info.port}/v1/models`);
-    console.log(`[webnesti] OpenAPI: http://localhost:${info.port}/v1/openapi.json`);
+    logger.info("Server started", { host: config.host, port: info.port, version: "0.8.0" });
+    logger.info("Frontend available");
+    logger.info("API available");
+    logger.info("OpenAPI spec available");
   });
 
   // Graceful shutdown

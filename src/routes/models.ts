@@ -1,22 +1,25 @@
 import { Hono } from "hono";
 import { dbAll, dbGet } from "../db/index.js";
+import { getCache, setCache, invalidateByTag } from "../cache.js";
 
 const models = new Hono();
 
-// GET /v1/models
+// GET /v1/models (cached for 60s, invalidated on model changes)
 models.get("/", (c) => {
-  const rows = dbAll("SELECT * FROM models WHERE is_active = 1 ORDER BY provider_id, id");
+  const cached = getCache<any[]>("models:list");
+  if (cached) return c.json({ object: "list", data: cached });
 
-  return c.json({
-    object: "list",
-    data: rows.map((m: any) => ({
-      id: m.id, object: "model", created: Math.floor(Date.now() / 1000),
-      owned_by: m.provider_id,
-      pricing: { prompt: m.pricing_input, completion: m.pricing_output },
-      capabilities: { streaming: !!m.supports_streaming, vision: !!m.supports_vision, tools: !!m.supports_tools },
-      context_length: m.context_length,
-    })),
-  });
+  const rows = dbAll("SELECT * FROM models WHERE is_active = 1 ORDER BY provider_id, id");
+  const data = rows.map((m: any) => ({
+    id: m.id, object: "model", created: Math.floor(Date.now() / 1000),
+    owned_by: m.provider_id,
+    pricing: { prompt: m.pricing_input, completion: m.pricing_output },
+    capabilities: { streaming: !!m.supports_streaming, vision: !!m.supports_vision, tools: !!m.supports_tools },
+    context_length: m.context_length,
+  }));
+
+  setCache("models:list", data, 60_000, ["models"]);
+  return c.json({ object: "list", data });
 });
 
 // GET /v1/models/:id
