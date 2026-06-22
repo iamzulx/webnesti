@@ -54,7 +54,7 @@ app.get("/health", async (c) => {
   const models = dbAll("SELECT COUNT(*) as count FROM models WHERE is_active = 1");
   const users = dbAll("SELECT COUNT(*) as count FROM users");
   return c.json({
-    status: "ok", server: "webnesti-api", version: "0.7.0",
+    status: "ok", server: "webnesti-api", version: "0.8.0",
     models: models[0]?.count || 0, users: users[0]?.count || 0,
     uptime: Math.round(process.uptime()),
   });
@@ -132,7 +132,7 @@ async function main() {
   setInterval(() => cleanupBuckets(), 60_000).unref();
 
   const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
-    console.log(`[webnesti v0.7.0] http://${config.host}:${info.port}`);
+    console.log(`[webnesti v0.8.0] http://${config.host}:${info.port}`);
     console.log(`[webnesti] Frontend: http://localhost:${info.port}/`);
     console.log(`[webnesti] API: http://localhost:${info.port}/v1/models`);
     console.log(`[webnesti] OpenAPI: http://localhost:${info.port}/v1/openapi.json`);

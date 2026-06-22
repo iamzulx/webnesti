@@ -5,7 +5,7 @@ export function generateOpenAPISpec() {
     info: {
       title: "WebNesti API",
       description: "Unified API for 100+ AI models. One endpoint, one key, one billing.",
-      version: "0.7.0",
+      version: "0.8.0",
       contact: { name: "WebNesti Support", url: "https://webnesti.ai" },
       license: { name: "MIT" },
     },
