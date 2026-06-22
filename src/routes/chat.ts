@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { bodyLimit } from "hono/body-limit";
-import { getProviderForModel } from "../providers/index.js";
+import { getProviderForModel, getProviderMap } from "../providers/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimitMiddleware } from "../middleware/rateLimit.js";
 import { dbGet, dbRun } from "../db/index.js";
 import { config } from "../config.js";
+import { resolveModel } from "../routing/router.js";
+import { executeWithFallback } from "../routing/fallback.js";
+import { recordRequest } from "../routing/strategies.js";
 
 const chat = new Hono();
 
@@ -128,12 +131,26 @@ chat.post("/completions", async (c) => {
     return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
   }
 
-  const resolved = getProviderForModel(modelId);
-  if (!resolved) {
-    return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
+  // Resolve model → provider using the routing engine (supports fallback chains,
+  // aliases, and smart provider selection). Falls back to direct lookup if the
+  // routing engine can't resolve (e.g. model not in any provider's list).
+  const providers = getProviderMap();
+  const routed = resolveModel(modelId, providers, "balanced");
+
+  let provider, rawModelId: string;
+  if (routed) {
+    provider = routed.provider;
+    rawModelId = routed.rawModelId;
+  } else {
+    // Fallback to direct provider lookup (legacy path)
+    const direct = getProviderForModel(modelId);
+    if (!direct) {
+      return c.json({ error: { message: `Model '${modelId}' not available. Check GET /v1/models`, type: "invalid_request_error" } }, 404);
+    }
+    provider = direct.provider;
+    rawModelId = direct.rawModelId;
   }
 
-  const { provider, rawModelId } = resolved;
   const startTime = Date.now();
 
   const priceIn = modelRow.pricing_input || 0;
@@ -161,23 +178,50 @@ chat.post("/completions", async (c) => {
 
     return stream(c, async (s) => {
       let completionTokens = 0;
+      let promptTokens = estimatedPromptTokens; // fallback estimate
+      let actualProviderId = provider.id;
+      let streamError = false;
+      let usageReported = false;
+
       try {
+        // Try primary provider first; if it fails mid-stream, we can't easily
+        // switch providers (data already sent to client), so streaming only uses
+        // the primary provider. Fallback is for non-streaming requests.
         for await (const chunk of provider.chatStream(body, rawModelId)) {
           await s.write(`data: ${JSON.stringify(chunk)}\n\n`);
           if (chunk.choices[0]?.delta?.content) completionTokens++;
+          // Check for usage in final chunk (OpenAI stream_options / Anthropic message_delta)
+          const chunkUsage = (chunk as any).usage;
+          if (chunkUsage && typeof chunkUsage === "object") {
+            if (chunkUsage.completion_tokens > 0) {
+              completionTokens = chunkUsage.completion_tokens;
+              usageReported = true;
+            }
+            if (chunkUsage.prompt_tokens > 0) {
+              promptTokens = chunkUsage.prompt_tokens;
+            }
+          }
         }
         await s.write("data: [DONE]\n\n");
       } catch (err: any) {
+        streamError = true;
         console.error("[chat:stream] provider error", err);
+        recordRequest(provider.id, Date.now() - startTime, false);
         await s.write(`data: ${JSON.stringify({ error: { message: "Upstream provider error", type: "provider_error" } })}\n\n`);
       }
 
-      const totalTokens = estimatedPromptTokens + completionTokens;
-      const cost = (estimatedPromptTokens * priceIn + completionTokens * priceOut) * markup;
+      if (!streamError) {
+        recordRequest(actualProviderId, Date.now() - startTime, true);
+      }
+
+      // Use provider-reported tokens when available, otherwise fall back to estimates
+      const finalPromptTokens = usageReported ? promptTokens : estimatedPromptTokens;
+      const totalTokens = finalPromptTokens + completionTokens;
+      const cost = (finalPromptTokens * priceIn + completionTokens * priceOut) * markup;
 
       // Deduct atomically; logs usage regardless of whether deduction succeeded.
       deductBalance(user.id, cost);
-      logUsage(user.id, apiKey.id, modelId, provider.id, estimatedPromptTokens, completionTokens, totalTokens, cost, Date.now() - startTime, 200, 1);
+      logUsage(user.id, apiKey.id, modelId, actualProviderId, finalPromptTokens, completionTokens, totalTokens, cost, Date.now() - startTime, streamError ? 502 : 200, 1);
     });
   }
 
@@ -187,27 +231,43 @@ chat.post("/completions", async (c) => {
     return c.json({ error: { message: "Insufficient balance. Please top up first.", type: "insufficient_balance" } }, 402);
   }
 
-  // --- NON-STREAMING ---
-  try {
-    const res = await provider.chat(body, rawModelId);
-    const latency = Date.now() - startTime;
+  // --- NON-STREAMING (with fallback chain) ---
+  const fallbackResult = await executeWithFallback(
+    providers,
+    provider.id,
+    async (p) => p.chat(body, rawModelId)
+  );
 
-    const cost = (res.usage.prompt_tokens * priceIn + res.usage.completion_tokens * priceOut) * markup;
+  const latency = Date.now() - startTime;
 
-    logUsage(user.id, apiKey.id, modelId, provider.id,
-      res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens,
-      cost, latency, 200, 0);
-
-    if (!deductBalance(user.id, cost)) {
-      return c.json({ error: { message: "Insufficient balance", type: "insufficient_balance" } }, 402);
-    }
-
-    return c.json({ ...res, webnesti: { cost_usd: Math.round(cost * 1000000) / 1000000, latency_ms: latency } });
-  } catch (err: any) {
-    // Do not leak upstream provider error details to the client.
-    console.error("[chat] provider error", err);
+  if (!fallbackResult.success) {
+    console.error("[chat] all providers failed:", fallbackResult.error);
     return c.json({ error: { message: "Upstream provider error", type: "provider_error" } }, 502);
   }
+
+  const res = fallbackResult.response;
+  const actualProviderId = fallbackResult.providerId;
+  const attempts = fallbackResult.attempts;
+
+  const cost = (res.usage.prompt_tokens * priceIn + res.usage.completion_tokens * priceOut) * markup;
+
+  logUsage(user.id, apiKey.id, modelId, actualProviderId,
+    res.usage.prompt_tokens, res.usage.completion_tokens, res.usage.total_tokens,
+    cost, latency, 200, 0);
+
+  if (!deductBalance(user.id, cost)) {
+    return c.json({ error: { message: "Insufficient balance", type: "insufficient_balance" } }, 402);
+  }
+
+  return c.json({
+    ...res,
+    webnesti: {
+      cost_usd: Math.round(cost * 1000000) / 1000000,
+      latency_ms: latency,
+      provider: actualProviderId,
+      fallback_attempts: attempts > 1 ? attempts : undefined,
+    },
+  });
 });
 
 function logUsage(userId: string, apiKeyId: string, modelId: string, providerId: string,

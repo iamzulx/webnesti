@@ -47,13 +47,30 @@ export class AnthropicProvider implements Provider {
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
     const stream = this.client.messages.stream({ model: modelId, max_tokens: req.max_tokens || 4096, system: system || undefined, messages });
     const id = randomUUID();
+    let inputTokens = 0;
+    let outputTokens = 0;
+
     for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      if (event.type === "message_start") {
+        // Capture input tokens from the initial message event
+        inputTokens = event.message?.usage?.input_tokens || 0;
+      } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
           choices: [{ index: 0, delta: { role: "assistant", content: event.delta.text }, finish_reason: null }] };
+      } else if (event.type === "message_delta") {
+        // Capture final cumulative output tokens from the delta event
+        outputTokens = event.usage?.output_tokens || 0;
       }
     }
+
+    // Yield final chunk with usage data
+    const usage = (inputTokens > 0 || outputTokens > 0)
+      ? { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens }
+      : undefined;
+
     yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
-      choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
+      choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      usage,
+    } as any;
   }
 }

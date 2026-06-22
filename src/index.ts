@@ -21,6 +21,7 @@ import adminRoutes from "./routes/admin.js";
 import budgetRoutes from "./routes/budget.js";
 import monetizationRoutes from "./routes/monetization.js";
 import { generateOpenAPISpec } from "./routes/docs.js";
+import viewsRoutes from "./routes/views.js";
 
 const app = new Hono();
 
@@ -75,6 +76,7 @@ app.route("/api/midtrans", midtransRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/budget", budgetRoutes);
 app.route("/api", monetizationRoutes);
+app.route("/views", viewsRoutes);
 
 // Static file serving (frontend SPA)
 const PUBLIC_DIR = join(process.cwd(), "public");

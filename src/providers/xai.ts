@@ -44,6 +44,7 @@ export class XAIProvider implements Provider {
     const stream = await this.client.chat.completions.create({
       model: modelId, messages: req.messages, temperature: req.temperature,
       max_tokens: req.max_tokens, stream: true,
+      stream_options: { include_usage: true },
     });
     for await (const chunk of stream) {
       yield {
@@ -52,7 +53,8 @@ export class XAIProvider implements Provider {
           index: c.index, delta: { role: c.delta.role as any, content: c.delta.content || undefined },
           finish_reason: c.finish_reason,
         })),
-      };
+        usage: chunk.usage || undefined,
+      } as any;
     }
   }
 }

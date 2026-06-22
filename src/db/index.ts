@@ -1,26 +1,114 @@
 import initSqlJs, { Database } from "sql.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, openSync, fsyncSync, closeSync, unlinkSync } from "fs";
 import { dirname } from "path";
 
 const DB_PATH = process.env.DATABASE_URL?.replace("file:", "") || "./data/webnesti.db";
+const DB_TMP_PATH = DB_PATH + ".tmp";
+
+// Auto-save configuration
+const FLUSH_INTERVAL_MS = parseInt(process.env.DB_FLUSH_MS || "2000"); // 2s default
+const FLUSH_IMMEDIATE_THRESHOLD = 50; // flush immediately after N mutations without save
 
 let db: Database;
+let isDirty = false;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let mutationCount = 0;
+let isFlushing = false;
+let initialized = false;
 
+// --- Persistence: atomic write with rename ---
+function flushToDisk(): void {
+  if (!db || !isDirty || isFlushing) return;
+  isFlushing = true;
+
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+
+    // Step 1: Write to temp file
+    writeFileSync(DB_TMP_PATH, buffer);
+
+    // Step 2: fsync to ensure data hits disk
+    try {
+      const fd = openSync(DB_TMP_PATH, "r+");
+      fsyncSync(fd);
+      closeSync(fd);
+    } catch {
+      // fsync may fail on some filesystems; the write is still durable enough
+    }
+
+    // Step 3: Atomic rename (POSIX guarantees this is atomic)
+    renameSync(DB_TMP_PATH, DB_PATH);
+
+    isDirty = false;
+    mutationCount = 0;
+  } catch (err) {
+    console.error("[db] Flush failed:", err);
+    // Schedule a retry
+    scheduleAutoFlush();
+  } finally {
+    isFlushing = false;
+  }
+}
+
+function scheduleAutoFlush(): void {
+  if (flushTimer) return; // already scheduled
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    if (isDirty) {
+      flushToDisk();
+    }
+  }, FLUSH_INTERVAL_MS);
+  // Don't block process exit on the timer
+  if (flushTimer && typeof flushTimer === "object" && "unref" in flushTimer) {
+    (flushTimer as any).unref();
+  }
+}
+
+function markDirty(): void {
+  isDirty = true;
+  mutationCount++;
+  scheduleAutoFlush();
+
+  // Immediate flush if we've accumulated many mutations without saving
+  if (mutationCount >= FLUSH_IMMEDIATE_THRESHOLD) {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    flushToDisk();
+  }
+}
+
+// --- Initialization ---
 export async function getDb(): Promise<Database> {
   if (db) return db;
 
   mkdirSync(dirname(DB_PATH), { recursive: true });
+
+  // Clean up leftover temp file from a crashed flush
+  try {
+    if (existsSync(DB_TMP_PATH)) unlinkSync(DB_TMP_PATH);
+  } catch {}
 
   const SQL = await initSqlJs();
 
   if (existsSync(DB_PATH)) {
     const buffer = readFileSync(DB_PATH);
     db = new SQL.Database(buffer);
+    console.log(`[db] Loaded from disk: ${DB_PATH} (${(buffer.length / 1024).toFixed(1)} KB)`);
   } else {
     db = new SQL.Database();
+    console.log("[db] Created new in-memory database");
   }
 
-  // Create all tables
+  // Optimal PRAGMAs for sql.js (in-memory with external persistence)
+  // WAL is NOT supported in sql.js/WASM, so we use MEMORY journal mode
+  db.run("PRAGMA journal_mode = MEMORY");
+  db.run("PRAGMA temp_store = MEMORY");
+  db.run("PRAGMA locking_mode = EXCLUSIVE");
+
+  // --- Schema: create all tables ---
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -114,7 +202,7 @@ export async function getDb(): Promise<Database> {
     )
   `);
 
-  // NEW: Referrals table
+  // Referrals table
   db.run(`
     CREATE TABLE IF NOT EXISTS referrals (
       id TEXT PRIMARY KEY,
@@ -124,7 +212,7 @@ export async function getDb(): Promise<Database> {
     )
   `);
 
-  // NEW: Referral uses table
+  // Referral uses table
   db.run(`
     CREATE TABLE IF NOT EXISTS referral_uses (
       id TEXT PRIMARY KEY,
@@ -136,7 +224,7 @@ export async function getDb(): Promise<Database> {
     )
   `);
 
-  // NEW: BYOK keys table
+  // BYOK keys table
   db.run(`
     CREATE TABLE IF NOT EXISTS byok_keys (
       id TEXT PRIMARY KEY,
@@ -159,34 +247,68 @@ export async function getDb(): Promise<Database> {
   db.run(`CREATE INDEX IF NOT EXISTS idx_referral_uses_referrer_id ON referral_uses(referrer_id)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_byok_keys_user_id ON byok_keys(user_id)`);
 
-  saveDb();
+  // Flush schema changes to disk immediately
+  isDirty = true;
+  flushToDisk();
+
+  // Register shutdown hooks
+  if (!initialized) {
+    initialized = true;
+
+    const gracefulFlush = (signal: string) => {
+      console.log(`[db] ${signal} received, flushing...`);
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      flushToDisk();
+    };
+
+    process.on("SIGINT", () => gracefulFlush("SIGINT"));
+    process.on("SIGTERM", () => gracefulFlush("SIGTERM"));
+    process.on("beforeExit", () => gracefulFlush("beforeExit"));
+
+    // Catch uncaught exceptions — flush what we can
+    process.on("uncaughtException", (err) => {
+      console.error("[db] Uncaught exception, attempting flush:", err.message);
+      try { flushToDisk(); } catch {}
+      process.exit(1);
+    });
+  }
+
+  console.log(`[db] Auto-save enabled (flush every ${FLUSH_INTERVAL_MS}ms or ${FLUSH_IMMEDIATE_THRESHOLD} mutations)`);
   return db;
 }
 
-export function saveDb() {
-  if (!db) return;
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  writeFileSync(DB_PATH, buffer);
+// --- Public save (manual flush) ---
+export function saveDb(): void {
+  flushToDisk();
 }
 
-// Query helpers
+// --- Query helpers ---
 export function dbAll(sql: string, params: any[] = []): any[] {
   const stmt = db.prepare(sql);
   stmt.bind(params);
-  const rows: any[] = [];
+  const results: any[] = [];
   while (stmt.step()) {
-    rows.push(stmt.getAsObject());
+    results.push(stmt.getAsObject());
   }
   stmt.free();
-  return rows;
+  return results;
 }
 
 export function dbGet(sql: string, params: any[] = []): any | undefined {
-  return dbAll(sql, params)[0];
+  const rows = dbAll(sql, params);
+  return rows[0];
 }
 
-export function dbRun(sql: string, params: any[] = []) {
+export function dbRun(sql: string, params: any[] = []): void {
   db.run(sql, params);
-  saveDb();
+  // Auto-mark dirty for non-SELECT statements
+  const trimmed = sql.trim().toUpperCase();
+  if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("PRAGMA")) {
+    markDirty();
+  }
+}
+
+// Check if dirty (useful for tests/debugging)
+export function isDbDirty(): boolean {
+  return isDirty;
 }

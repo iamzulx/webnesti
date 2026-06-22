@@ -5,3 +5,4 @@ data/*.db
 dist/
 .next-cli-build/
 .next/
+data/*.db.tmp
