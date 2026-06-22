@@ -60,21 +60,39 @@ views.get("/auth", (c) => {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>WebNesti — Login</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%230ea5e9'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>W</text></svg>" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="/js/alpine.min.js" defer></script>
+        <script src="/js/app.js"></script>
         <script dangerouslySetInnerHTML={{ __html: `
 tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }, colors: { accent: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49' } } } } }` }} />
         <style dangerouslySetInnerHTML={{ __html: `
 body{font-family:'Inter',system-ui,sans-serif;background:#030712;color:#e5e7eb}
 .card{background:#0f172a;border:1px solid #1f2937;border-radius:12px;padding:20px}
-.btn-primary{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border-radius:10px;padding:10px 24px;font-weight:600;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border-radius:10px;padding:10px 24px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(14,165,233,0.3)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
 input,select{background:#0f172a;border:1px solid #1f2937;color:#e5e7eb;border-radius:10px;padding:10px 14px;font-size:14px;outline:none;width:100%}
 input:focus,select:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,0.1)}
+/* Toast notifications */
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:400px;width:calc(100% - 40px);pointer-events:none}
+.toast{pointer-events:all;padding:14px 18px;border-radius:10px;font-size:14px;font-weight:500;display:flex;align-items:flex-start;gap:10px;animation:toast-in .3s ease-out forwards;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.toast.removing{animation:toast-out .3s ease-in forwards}
+.toast-success{background:#065f46;border:1px solid #10b981;color:#6ee7b7}
+.toast-error{background:#7f1d1d;border:1px solid #ef4444;color:#fca5a5}
+.toast-warning{background:#78350f;border:1px solid #f59e0b;color:#fcd34d}
+.toast-info{background:#1e3a5f;border:1px solid #0ea5e9;color:#7dd3fc}
+.toast-icon{font-size:18px;flex-shrink:0;line-height:1}
+.toast-close{margin-left:auto;cursor:pointer;opacity:.6;font-size:16px;flex-shrink:0}
+.toast-close:hover{opacity:1}
+@keyframes toast-in{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+@keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(100%)}}
 ` }} />
       </head>
       <body>
+        <div id="toast-container" class="toast-container"></div>
         <AuthPage />
       </body>
     </html>
