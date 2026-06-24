@@ -33,8 +33,8 @@ function flushToDisk(): void {
       const fd = openSync(DB_TMP_PATH, "r+");
       fsyncSync(fd);
       closeSync(fd);
-    } catch {
-      // fsync may fail on some filesystems; the write is still durable enough
+    } catch (err) {
+      console.warn("[db] fsync failed (non-fatal):", (err as Error).message);
     }
 
     // Step 3: Atomic rename (POSIX guarantees this is atomic)
@@ -89,7 +89,9 @@ export async function getDb(): Promise<Database> {
   // Clean up leftover temp file from a crashed flush
   try {
     if (existsSync(DB_TMP_PATH)) unlinkSync(DB_TMP_PATH);
-  } catch {}
+  } catch (err) {
+    console.warn("[db] Failed to remove stale temp file:", (err as Error).message);
+  }
 
   const SQL = await initSqlJs();
 
@@ -128,7 +130,12 @@ export async function getDb(): Promise<Database> {
   // already exists, so swallow that case.
   try {
     db.run(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0 NOT NULL`);
-  } catch {}
+  } catch (err) {
+    const msg = (err as Error).message || "";
+    if (!msg.includes("duplicate column")) {
+      console.error("[db] Migration failed (is_admin column):", msg);
+    }
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS api_keys (
@@ -268,7 +275,9 @@ export async function getDb(): Promise<Database> {
     // Catch uncaught exceptions — flush what we can
     process.on("uncaughtException", (err) => {
       console.error("[db] Uncaught exception, attempting flush:", err.message);
-      try { flushToDisk(); } catch {}
+      try { flushToDisk(); } catch (flushErr) {
+        console.error("[db] Emergency flush also failed:", (flushErr as Error).message);
+      }
       process.exit(1);
     });
   }

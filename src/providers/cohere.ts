@@ -128,7 +128,9 @@ export class CohereProvider implements Provider {
                 choices: [{ index: 0, delta: { role: "assistant", content: chunk.delta?.message?.content?.text || "" }, finish_reason: null }],
               };
             }
-          } catch {}
+          } catch (err) {
+            console.warn("[cohere] Failed to parse SSE chunk:", (err as Error).message);
+          }
         }
       }
     }

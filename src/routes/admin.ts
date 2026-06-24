@@ -58,7 +58,12 @@ admin.get("/users/:id", (c) => {
 // PUT /api/admin/users/:id — update user
 admin.put("/users/:id", async (c) => {
   const userId = c.req.param("id");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { name, tier, balance } = body;
 
   const user = dbGet("SELECT id FROM users WHERE id = ?", [userId]);
@@ -124,7 +129,12 @@ admin.get("/models", (c) => {
 // PUT /api/admin/models/:id — update model
 admin.put("/models/:id", async (c) => {
   const modelId = c.req.param("id");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { pricing_input, pricing_output, is_active, context_length } = body;
 
   const model = dbGet("SELECT id FROM models WHERE id = ?", [modelId]);

@@ -11,7 +11,12 @@ keys.use("*", authMiddleware);
 // Create API key
 keys.post("/", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
 
   // Validate input shape with Zod.
   const parsed = CreateKeySchema.safeParse(body);

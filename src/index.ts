@@ -137,7 +137,9 @@ app.get("/*", async (c) => {
       c.header("Content-Type", mime);
       c.header("Cache-Control", ext === ".html" ? "no-cache" : "public, max-age=3600");
       return c.body(content);
-    } catch {}
+    } catch (err) {
+      logger.warn("Static file read failed", { path: filePath, error: (err as Error).message });
+    }
   }
   const indexPath = join(PUBLIC_DIR, "index.html");
   if (existsSync(indexPath)) {

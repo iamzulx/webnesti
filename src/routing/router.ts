@@ -46,7 +46,8 @@ const MODEL_ALIASES: Record<string, { providerId: string; rawModelId: string }> 
 function providerHasModel(provider: Provider, modelId: string): boolean {
   try {
     return provider.listModels().some((m) => m.id === modelId);
-  } catch {
+  } catch (err) {
+    console.warn(`[router] listModels failed for provider '${provider.id}':`, (err as Error).message);
     return false;
   }
 }

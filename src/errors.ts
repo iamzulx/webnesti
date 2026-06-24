@@ -17,6 +17,10 @@ export class RateLimitError extends AppError {
   constructor(msg = "Rate limit exceeded") { super(msg, 429, "rate_limit_exceeded"); }
 }
 
+export class BadRequestError extends AppError {
+  constructor(msg = "Bad request") { super(msg, 400, "bad_request"); }
+}
+
 export class InsufficientBalanceError extends AppError {
   constructor(msg = "Insufficient balance") { super(msg, 402, "insufficient_balance"); }
 }

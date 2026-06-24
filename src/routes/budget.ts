@@ -39,7 +39,12 @@ budget.get("/", (c) => {
 // self-imposed monthly_budget (a soft spend cap) can be set here.
 budget.put("/", async (c) => {
   const apiKey = c.get("apiKey");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { monthly_budget } = body;
 
   if (monthly_budget !== undefined && monthly_budget !== null) {

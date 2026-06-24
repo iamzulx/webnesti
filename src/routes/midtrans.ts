@@ -18,7 +18,12 @@ const midtrans = new Hono();
 // POST /api/midtrans/create — create Snap transaction
 midtrans.post("/create", authMiddleware, async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: { message: "Invalid JSON in request body" } }, 400);
+  }
   const amount = parseFloat(body.amount || "0");
   if (!amount || amount < 1000) {
     return c.json({ error: { message: "Minimum top-up Rp1.000" } }, 400);
@@ -67,7 +72,18 @@ midtrans.post("/create", authMiddleware, async (c) => {
 
 // POST /api/midtrans/callback — Midtrans notification callback with signature verification
 midtrans.post("/callback", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    logger.warn("midtrans callback received non-JSON body");
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
+
+  if (!body.order_id || !body.status_code || !body.gross_amount || !body.signature_key) {
+    logger.warn("midtrans callback missing required fields", { keys: Object.keys(body) });
+    return c.json({ error: "Missing required callback fields" }, 400);
+  }
 
   if (!config.midtransServerKey) {
     return c.json({ error: "Server configuration error" }, 500);
