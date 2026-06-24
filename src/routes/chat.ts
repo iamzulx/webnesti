@@ -6,6 +6,7 @@ import type { Provider } from "../providers/types.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimitMiddleware } from "../middleware/rateLimit.js";
 import { dbGet, dbRun } from "../db/index.js";
+import { monthlySpendByKey, dailyRequestsByKey } from "../db/queries.js";
 import { config } from "../config.js";
 import { resolveModel } from "../routing/router.js";
 import { recordRequest } from "../routing/strategies.js";
@@ -125,22 +126,14 @@ function creditBalance(userId: string, amount: number): void {
   dbRun("UPDATE users SET balance = balance + ? WHERE id = ?", [amount, userId]);
 }
 
-function spentThisMonth(apiKeyId: string): number {
-  const row = dbGet("SELECT COALESCE(SUM(cost_usd), 0) AS total FROM usage_logs WHERE api_key_id = ? AND created_at >= datetime('now', 'start of month')", [apiKeyId]);
-  return row?.total || 0;
-}
 
-function requestsToday(apiKeyId: string): number {
-  const row = dbGet("SELECT COUNT(*) AS total FROM usage_logs WHERE api_key_id = ? AND created_at >= datetime('now', '-1 day')", [apiKeyId]);
-  return row?.total || 0;
-}
 
 function enforceUsageCaps(apiKey: any, reserveCost: number): { ok: boolean; message?: string } {
-  if (apiKey.daily_limit && requestsToday(apiKey.id) >= apiKey.daily_limit) {
+  if (apiKey.daily_limit && dailyRequestsByKey(apiKey.id) >= apiKey.daily_limit) {
     return { ok: false, message: "Daily request limit exceeded" };
   }
   if (apiKey.monthly_budget != null) {
-    const remaining = Number(apiKey.monthly_budget) - spentThisMonth(apiKey.id);
+    const remaining = Number(apiKey.monthly_budget) - monthlySpendByKey(apiKey.id);
     if (remaining < reserveCost) return { ok: false, message: "Monthly budget exceeded" };
   }
   return { ok: true };

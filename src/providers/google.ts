@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo } from "./types.js";
 import { randomUUID } from "crypto";
+import { unixNow, buildModelList } from "./openai-mappers.js";
 
 export class GoogleProvider implements Provider {
   id = "google";
@@ -16,13 +17,10 @@ export class GoogleProvider implements Provider {
   isAvailable(): boolean { return !!this.apiKey; }
 
   listModels(): ModelInfo[] {
-    const now = Math.floor(Date.now() / 1000);
-    return [
-      { id: "gemini-2.0-flash", object: "model", created: now, owned_by: "google" },
-      { id: "gemini-2.5-pro-preview-05-06", object: "model", created: now, owned_by: "google" },
-      { id: "gemini-1.5-pro", object: "model", created: now, owned_by: "google" },
-      { id: "gemini-1.5-flash", object: "model", created: now, owned_by: "google" },
-    ];
+    return buildModelList(
+      ["gemini-2.0-flash", "gemini-2.5-pro-preview-05-06", "gemini-1.5-pro", "gemini-1.5-flash"],
+      "google",
+    );
   }
 
   async chat(req: ChatRequest, modelId: string): Promise<ChatResponse> {
@@ -35,7 +33,7 @@ export class GoogleProvider implements Provider {
     const res = await chat.sendMessage(lastMsg);
     const text = res.response.text();
     return {
-      id: randomUUID(), object: "chat.completion", created: Math.floor(Date.now() / 1000), model: modelId,
+      id: randomUUID(), object: "chat.completion", created: unixNow(), model: modelId,
       choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
       usage: {
         prompt_tokens: res.response.usageMetadata?.promptTokenCount || 0,
@@ -57,11 +55,11 @@ export class GoogleProvider implements Provider {
     for await (const chunk of stream.stream) {
       const text = chunk.text();
       if (text) {
-        yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
+        yield { id, object: "chat.completion.chunk", created: unixNow(), model: modelId,
           choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] };
       }
     }
-    yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
+    yield { id, object: "chat.completion.chunk", created: unixNow(), model: modelId,
       choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
   }
 }

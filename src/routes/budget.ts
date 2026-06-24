@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { dbAll, dbGet, dbRun } from "../db/index.js";
+import { dbGet, dbRun } from "../db/index.js";
+import { monthlySpendByUser, dailySpendByUser, dailyRequestsByUser } from "../db/queries.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const budget = new Hono();
@@ -10,22 +11,12 @@ budget.get("/", (c) => {
   const user = c.get("user");
   const apiKey = c.get("apiKey");
 
-  const monthlySpend = dbGet(`
-    SELECT COALESCE(SUM(cost_usd), 0) as total
-    FROM usage_logs WHERE user_id = ? AND created_at > datetime('now', 'start of month')
-  `, [user.id]);
-
-  const dailySpend = dbGet(`
-    SELECT COALESCE(SUM(cost_usd), 0) as total
-    FROM usage_logs WHERE user_id = ? AND created_at > datetime('now', '-1 day')
-  `, [user.id]);
-
   return c.json({
     user_id: user.id,
     balance: user.balance,
     tier: user.tier,
-    monthly_spend: monthlySpend?.total || 0,
-    daily_spend: dailySpend?.total || 0,
+    monthly_spend: monthlySpendByUser(user.id),
+    daily_spend: dailySpendByUser(user.id),
     monthly_budget: apiKey.monthly_budget || null,
     rate_limit: apiKey.rate_limit,
     daily_limit: apiKey.daily_limit,
@@ -67,25 +58,20 @@ budget.get("/alerts", (c) => {
     alerts.push({ level: "warning", message: "Balance below $5.", type: "low_balance" });
   }
 
-  const monthlySpend = dbGet(`
-    SELECT COALESCE(SUM(cost_usd), 0) as total
-    FROM usage_logs WHERE user_id = ? AND created_at > datetime('now', 'start of month')
-  `, [user.id]);
+  const monthlySpend = monthlySpendByUser(user.id);
 
-  if (apiKey.monthly_budget && monthlySpend?.total > apiKey.monthly_budget * 0.8) {
-    const pct = Math.round((monthlySpend.total / apiKey.monthly_budget) * 100);
+  if (apiKey.monthly_budget && monthlySpend > apiKey.monthly_budget * 0.8) {
+    const pct = Math.round((monthlySpend / apiKey.monthly_budget) * 100);
     alerts.push({ level: "warning", message: `Monthly spend at ${pct}% of budget.`, type: "budget_threshold" });
   }
 
-  const dailyRequests = dbGet(`
-    SELECT COUNT(*) as count FROM usage_logs WHERE user_id = ? AND created_at > datetime('now', '-1 day')
-  `, [user.id]);
+  const dailyRequests = dailyRequestsByUser(user.id);
 
-  if (dailyRequests?.count > apiKey.daily_limit * 0.9) {
-    alerts.push({ level: "warning", message: `Daily requests at ${dailyRequests.count}/${apiKey.daily_limit}.`, type: "daily_limit" });
+  if (dailyRequests > apiKey.daily_limit * 0.9) {
+    alerts.push({ level: "warning", message: `Daily requests at ${dailyRequests}/${apiKey.daily_limit}.`, type: "daily_limit" });
   }
 
-  return c.json({ alerts, monthly_spend: monthlySpend?.total || 0, daily_requests: dailyRequests?.count || 0 });
+  return c.json({ alerts, monthly_spend: monthlySpend, daily_requests: dailyRequests });
 });
 
 export default budget;
