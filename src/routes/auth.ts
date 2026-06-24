@@ -89,7 +89,12 @@ auth.post("/register", async (c) => {
     return c.json({ error: "Too many attempts, try again later" }, 429);
   }
 
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const parsed = RegisterSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues[0]?.message || "Invalid email or password" }, 400);
@@ -134,7 +139,12 @@ auth.post("/login", async (c) => {
     return c.json({ error: "Too many attempts, try again later" }, 429);
   }
 
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const parsed = LoginSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "Invalid email or password" }, 400);

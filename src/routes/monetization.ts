@@ -45,7 +45,12 @@ monetization.get("/pricing/current", (c) => {
 // POST /api/pricing/upgrade — upgrade tier
 monetization.post("/pricing/upgrade", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { tier } = body;
 
   if (!tier || !TIERS[tier]) {
@@ -114,7 +119,12 @@ monetization.get("/referral", (c) => {
 // POST /api/referral/apply — apply referral code during signup
 monetization.post("/referral/apply", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { code } = body;
 
   if (!code) return c.json({ error: "Referral code required" }, 400);
@@ -180,7 +190,12 @@ monetization.get("/referral/leaderboard", (c) => {
 // POST /api/byok — register user's own API key
 monetization.post("/byok", async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON in request body" }, 400);
+  }
   const { provider, api_key } = body;
 
   if (!provider || !api_key) return c.json({ error: "provider and api_key required" }, 400);
