@@ -44,7 +44,6 @@ app.use("*", async (c, next) => {
   await next();
   const duration = Date.now() - start;
   c.header("X-Response-Time", `${duration}ms`);
-  c.header("X-Powered-By", "WebNesti");
 
   // Skip logging for static assets and health checks
   if (path === "/health" || path === "/metrics" || path.startsWith("/favicon")) return;
@@ -60,20 +59,13 @@ app.onError((err, c) => {
   if (err instanceof AppError) {
     return c.json({ error: { message: err.message, type: err.code || "error" } }, err.status as ContentfulStatusCode);
   }
-  console.error("[error]", err);
+  logger.error("Unhandled error", { message: err?.message });
   return c.json({ error: { message: "Internal server error", type: "server_error" } }, 500);
 });
 
-// Health
-app.get("/health", async (c) => {
-  const { dbAll } = await import("./db/index.js");
-  const models = dbAll("SELECT COUNT(*) as count FROM models WHERE is_active = 1");
-  const users = dbAll("SELECT COUNT(*) as count FROM users");
-  return c.json({
-    status: "ok", server: "webnesti-api", version: "0.8.1",
-    models: models[0]?.count || 0, users: users[0]?.count || 0,
-    uptime: Math.round(process.uptime()),
-  });
+// Health — only expose liveness info; no internal counts.
+app.get("/health", (c) => {
+  return c.json({ status: "ok" });
 });
 
 // OpenAPI spec
@@ -109,8 +101,11 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
-// Prometheus metrics
-app.get("/metrics", (c) => {
+// Prometheus metrics — require a bearer token so scrapers are authenticated.
+import { authMiddleware } from "./middleware/auth.js";
+app.get("/metrics", authMiddleware, (c) => {
+  const user = c.get("user");
+  if (!user.is_admin) return c.json({ error: "Admin access required" }, 403);
   setGauge("webnesti_uptime_seconds", Math.round(process.uptime()));
   return c.text(renderMetrics(), 200, { "Content-Type": "text/plain; version=0.0.4" });
 });

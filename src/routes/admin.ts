@@ -56,6 +56,8 @@ admin.get("/users/:id", (c) => {
 });
 
 // PUT /api/admin/users/:id — update user
+const VALID_TIERS = new Set(["free", "starter", "pro", "enterprise", "suspended"]);
+
 admin.put("/users/:id", async (c) => {
   const userId = c.req.param("id");
   const body = await c.req.json().catch(() => ({}));
@@ -64,9 +66,21 @@ admin.put("/users/:id", async (c) => {
   const user = dbGet("SELECT id FROM users WHERE id = ?", [userId]);
   if (!user) return c.json({ error: "User not found" }, 404);
 
-  if (name) dbRun("UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [name, userId]);
-  if (tier) dbRun("UPDATE users SET tier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [tier, userId]);
-  if (balance !== undefined) dbRun("UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [balance, userId]);
+  if (name !== undefined) {
+    if (typeof name !== "string" || name.length === 0 || name.length > 100)
+      return c.json({ error: "name must be a non-empty string (max 100 chars)" }, 400);
+    dbRun("UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [name, userId]);
+  }
+  if (tier !== undefined) {
+    if (typeof tier !== "string" || !VALID_TIERS.has(tier))
+      return c.json({ error: `tier must be one of: ${[...VALID_TIERS].join(", ")}` }, 400);
+    dbRun("UPDATE users SET tier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [tier, userId]);
+  }
+  if (balance !== undefined) {
+    if (typeof balance !== "number" || !Number.isFinite(balance) || balance < 0)
+      return c.json({ error: "balance must be a non-negative number" }, 400);
+    dbRun("UPDATE users SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [balance, userId]);
+  }
 
   return c.json({ id: userId, updated: true });
 });
@@ -130,10 +144,22 @@ admin.put("/models/:id", async (c) => {
   const model = dbGet("SELECT id FROM models WHERE id = ?", [modelId]);
   if (!model) return c.json({ error: "Model not found" }, 404);
 
-  if (pricing_input !== undefined) dbRun("UPDATE models SET pricing_input = ? WHERE id = ?", [pricing_input, modelId]);
-  if (pricing_output !== undefined) dbRun("UPDATE models SET pricing_output = ? WHERE id = ?", [pricing_output, modelId]);
+  if (pricing_input !== undefined) {
+    if (typeof pricing_input !== "number" || !Number.isFinite(pricing_input) || pricing_input < 0)
+      return c.json({ error: "pricing_input must be a non-negative number" }, 400);
+    dbRun("UPDATE models SET pricing_input = ? WHERE id = ?", [pricing_input, modelId]);
+  }
+  if (pricing_output !== undefined) {
+    if (typeof pricing_output !== "number" || !Number.isFinite(pricing_output) || pricing_output < 0)
+      return c.json({ error: "pricing_output must be a non-negative number" }, 400);
+    dbRun("UPDATE models SET pricing_output = ? WHERE id = ?", [pricing_output, modelId]);
+  }
   if (is_active !== undefined) dbRun("UPDATE models SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, modelId]);
-  if (context_length !== undefined) dbRun("UPDATE models SET context_length = ? WHERE id = ?", [context_length, modelId]);
+  if (context_length !== undefined) {
+    if (typeof context_length !== "number" || !Number.isInteger(context_length) || context_length <= 0)
+      return c.json({ error: "context_length must be a positive integer" }, 400);
+    dbRun("UPDATE models SET context_length = ? WHERE id = ?", [context_length, modelId]);
+  }
 
   // Bust the /v1/models response cache so the change is visible immediately.
   invalidateByTag("models");
