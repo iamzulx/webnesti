@@ -14,9 +14,34 @@ echo ""
 echo "2. Validator tests..."
 node --import tsx test/validators.test.ts
 
-# 3. Start server briefly and test endpoints
+# 3. Cache tests
 echo ""
-echo "3. Endpoint smoke tests..."
+echo "3. Cache tests..."
+node --import tsx test/cache.test.ts
+
+# 4. Error classes tests
+echo ""
+echo "4. Error classes tests..."
+node --import tsx test/errors.test.ts
+
+# 5. Metrics tests
+echo ""
+echo "5. Metrics tests..."
+node --import tsx test/metrics.test.ts
+
+# 6. Routing strategies tests
+echo ""
+echo "6. Routing strategies tests..."
+node --import tsx test/strategies.test.ts
+
+# 7. Fallback tests
+echo ""
+echo "7. Fallback tests..."
+node --import tsx test/fallback.test.ts
+
+# 8. Start server briefly and test endpoints
+echo ""
+echo "8. Endpoint smoke tests..."
 node --import tsx -e "
 import { getDb } from './src/db/index.js';
 import { serve } from '@hono/node-server';
@@ -52,7 +77,7 @@ test().catch(e => { console.error(e); process.exit(1); });
 " 2>&1 | grep -v "^\[db\]"
 
 echo ""
-echo "4. Aggregator endpoint tests (/v1/status, /v1/models filter)..."
+echo "9. Aggregator endpoint tests (/v1/status, /v1/models filter)..."
 node --import tsx -e "
 import { getDb } from './src/db/index.js';
 import { serve } from '@hono/node-server';
