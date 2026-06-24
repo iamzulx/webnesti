@@ -3,7 +3,7 @@ import { dbGet, dbRun } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { v4 as uuidv4 } from "uuid";
 import midtransClient from "midtrans-client";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 
@@ -73,12 +73,25 @@ midtrans.post("/callback", async (c) => {
     return c.json({ error: "Server configuration error" }, 500);
   }
 
+  // Reject early if required signature fields are missing.
+  if (
+    typeof body.order_id !== "string" ||
+    typeof body.status_code !== "string" ||
+    typeof body.gross_amount !== "string" ||
+    typeof body.signature_key !== "string"
+  ) {
+    return c.json({ error: "Missing required fields" }, 400);
+  }
+
   // Verify signature: SHA512(order_id + status_code + gross_amount + serverKey)
   const expectedSignature = createHash("sha512")
     .update(`${body.order_id}${body.status_code}${body.gross_amount}${config.midtransServerKey}`)
     .digest("hex");
 
-  if (body.signature_key !== expectedSignature) {
+  // Use constant-time comparison to prevent timing oracle attacks.
+  const sigBuf = Buffer.from(body.signature_key, "utf8");
+  const expectedBuf = Buffer.from(expectedSignature, "utf8");
+  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
     logger.warn("midtrans invalid signature", { order_id: body.order_id });
     return c.json({ error: "Invalid signature" }, 403);
   }
