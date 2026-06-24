@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo } from "./types.js";
 import { randomUUID } from "crypto";
+import { unixNow, buildModelList } from "./openai-mappers.js";
 
 export class AnthropicProvider implements Provider {
   id = "anthropic";
@@ -14,15 +15,10 @@ export class AnthropicProvider implements Provider {
   isAvailable(): boolean { return !!this.client.apiKey; }
 
   listModels(): ModelInfo[] {
-    const now = Math.floor(Date.now() / 1000);
-    return [
-      { id: "claude-fable-5", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-opus-4-8", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-sonnet-4-6", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-haiku-4-5", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-opus-4-7", object: "model", created: now, owned_by: "anthropic" },
-      { id: "claude-sonnet-4-5", object: "model", created: now, owned_by: "anthropic" },
-    ];
+    return buildModelList(
+      ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-7", "claude-sonnet-4-5"],
+      "anthropic",
+    );
   }
 
   async chat(req: ChatRequest, modelId: string): Promise<ChatResponse> {
@@ -35,7 +31,7 @@ export class AnthropicProvider implements Provider {
     });
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     return {
-      id: res.id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: res.model,
+      id: res.id, object: "chat.completion", created: unixNow(), model: res.model,
       choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: res.stop_reason || "stop" }],
       usage: { prompt_tokens: res.usage.input_tokens, completion_tokens: res.usage.output_tokens, total_tokens: res.usage.input_tokens + res.usage.output_tokens },
     };
@@ -55,7 +51,7 @@ export class AnthropicProvider implements Provider {
         // Capture input tokens from the initial message event
         inputTokens = event.message?.usage?.input_tokens || 0;
       } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
+        yield { id, object: "chat.completion.chunk", created: unixNow(), model: modelId,
           choices: [{ index: 0, delta: { role: "assistant", content: event.delta.text }, finish_reason: null }] };
       } else if (event.type === "message_delta") {
         // Capture final cumulative output tokens from the delta event
@@ -68,7 +64,7 @@ export class AnthropicProvider implements Provider {
       ? { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens }
       : undefined;
 
-    yield { id, object: "chat.completion.chunk", created: Math.floor(Date.now() / 1000), model: modelId,
+    yield { id, object: "chat.completion.chunk", created: unixNow(), model: modelId,
       choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
       usage,
     } as any;

@@ -1,5 +1,6 @@
 import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo } from "./types.js";
 import OpenAI from "openai";
+import { unixNow, mapOpenAIResponse, mapOpenAIStreamChunk } from "./openai-mappers.js";
 
 /**
  * Generic OpenAI-compatible provider.
@@ -19,11 +20,10 @@ export class OpenAICompatProvider implements Provider {
     this.name = name;
     this.baseUrl = baseUrl;
     this.client = new OpenAI({ apiKey, baseURL: baseUrl });
-    const now = Math.floor(Date.now() / 1000);
     this.models = models.map(m => ({
       id: m.id,
       object: "model" as const,
-      created: now,
+      created: unixNow(),
       owned_by: id,
       context_length: m.contextLength,
     }));
@@ -41,19 +41,7 @@ export class OpenAICompatProvider implements Provider {
       top_p: req.top_p,
       stream: false,
     });
-    return {
-      id: res.id, object: "chat.completion", created: res.created, model: res.model,
-      choices: res.choices.map((c, i) => ({
-        index: i,
-        message: { role: "assistant" as const, content: c.message.content || "" },
-        finish_reason: c.finish_reason || "stop",
-      })),
-      usage: {
-        prompt_tokens: res.usage?.prompt_tokens || 0,
-        completion_tokens: res.usage?.completion_tokens || 0,
-        total_tokens: res.usage?.total_tokens || 0,
-      },
-    };
+    return mapOpenAIResponse(res);
   }
 
   async *chatStream(req: ChatRequest, modelId: string): AsyncGenerator<StreamChunk> {
@@ -63,15 +51,7 @@ export class OpenAICompatProvider implements Provider {
       stream_options: { include_usage: true },
     });
     for await (const chunk of stream) {
-      yield {
-        id: chunk.id, object: "chat.completion.chunk", created: chunk.created, model: chunk.model,
-        choices: chunk.choices.map((c) => ({
-          index: c.index,
-          delta: { role: c.delta.role as any, content: c.delta.content || undefined },
-          finish_reason: c.finish_reason,
-        })),
-        usage: chunk.usage || undefined,
-      } as any;
+      yield mapOpenAIStreamChunk(chunk) as any;
     }
   }
 }

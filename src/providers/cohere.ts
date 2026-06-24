@@ -1,5 +1,6 @@
 import { Provider, ChatRequest, ChatResponse, StreamChunk, ModelInfo, ChatMessage } from "./types.js";
 import { randomUUID } from "crypto";
+import { unixNow, buildModelList } from "./openai-mappers.js";
 
 /**
  * Map our OpenAI-style messages to the Cohere v2 chat schema. v2 uses a single
@@ -28,13 +29,7 @@ export class CohereProvider implements Provider {
   isAvailable(): boolean { return !!this.apiKey; }
 
   listModels(): ModelInfo[] {
-    const now = Math.floor(Date.now() / 1000);
-    return [
-      { id: "command-a", object: "model", created: now, owned_by: "cohere" },
-      { id: "command-r-plus", object: "model", created: now, owned_by: "cohere" },
-      { id: "command-r", object: "model", created: now, owned_by: "cohere" },
-      { id: "command", object: "model", created: now, owned_by: "cohere" },
-    ];
+    return buildModelList(["command-a", "command-r-plus", "command-r", "command"], "cohere");
   }
 
   async chat(req: ChatRequest, modelId: string): Promise<ChatResponse> {
@@ -66,7 +61,7 @@ export class CohereProvider implements Provider {
     return {
       id: data.id || randomUUID(),
       object: "chat.completion",
-      created: Math.floor(Date.now() / 1000),
+      created: unixNow(),
       model: modelId,
       choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
       usage: {
@@ -124,7 +119,7 @@ export class CohereProvider implements Provider {
             if (chunk.type === "content-delta") {
               yield {
                 id, object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000), model: modelId,
+                created: unixNow(), model: modelId,
                 choices: [{ index: 0, delta: { role: "assistant", content: chunk.delta?.message?.content?.text || "" }, finish_reason: null }],
               };
             }
@@ -135,7 +130,7 @@ export class CohereProvider implements Provider {
 
     yield {
       id, object: "chat.completion.chunk",
-      created: Math.floor(Date.now() / 1000), model: modelId,
+      created: unixNow(), model: modelId,
       choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
     };
   }
