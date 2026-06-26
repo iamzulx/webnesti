@@ -113,11 +113,18 @@ views.get("/dashboard", (c) => {
     GROUP BY model_id ORDER BY requests DESC LIMIT 10
   `, user ? [user.id] : []);
 
+  const totalModels = dbGet("SELECT COUNT(*) as count FROM models WHERE is_active = 1")?.count || 0;
+  const providerStatuses = Object.entries(config.providers).map(([name, cfg]) => ({
+    name, configured: !!cfg.apiKey,
+  }));
+
   return renderPage(c, "Dashboard", "dashboard", user,
     <DashboardPage data={{
       user: user || { email: "guest", balance: 0, tier: "free" },
       stats,
       recentModels,
+      totalModels,
+      providerStatuses,
     }} />
   );
 });
@@ -125,10 +132,20 @@ views.get("/dashboard", (c) => {
 // --- Models ---
 views.get("/models", (c) => {
   const user = getUserFromContext(c);
-  const models = dbAll("SELECT * FROM models WHERE is_active = 1 ORDER BY provider_id, id");
+  const models = dbAll("SELECT * FROM models WHERE is_active = 1 ORDER BY provider_id, id") as any[];
   const providers = [...new Set(models.map((m: any) => m.provider_id))] as string[];
+  const providerSummaries = providers.map(p => {
+    const pModels = models.filter(m => m.provider_id === p);
+    const prices = pModels.flatMap((m: any) => [m.pricing_input, m.pricing_output]).filter((x: number) => x > 0);
+    return {
+      name: p,
+      count: pModels.length,
+      minPrice: prices.length ? Math.min(...prices) * 1_000_000 : 0,
+      maxPrice: prices.length ? Math.max(...prices) * 1_000_000 : 0,
+    };
+  });
   return renderPage(c, "Models", "models", user,
-    <ModelsPage models={models} providers={providers} />
+    <ModelsPage models={models} providers={providers} providerSummaries={providerSummaries} />
   );
 });
 

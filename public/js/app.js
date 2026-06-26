@@ -4,7 +4,7 @@
  * XSS Note: innerHTML is used only for:
  * 1. Toast notifications — content generated from this script or escaped via escapeHtml()
  * 2. Skeleton/loading states — static HTML templates
- * 3. Playground user messages — escaped via escapeHtml() before DOM insertion
+ * 3. Playground user messages — escaped via escapeHtml() / renderContent()
  * 4. API response display — error messages come from our own API (trusted)
  * No untrusted server-rendered HTML is ever injected via innerHTML.
  */
@@ -14,7 +14,6 @@
 
   // ============================================================
   // TOAST NOTIFICATION SYSTEM
-  // Replaces all alert() calls with proper UI notifications
   // ============================================================
   const TOAST_DURATION = 4000;
   let toastId = 0;
@@ -41,13 +40,11 @@
     if (!el) return;
     el.classList.add("removing");
     el.addEventListener("animationend", () => el.remove());
-    setTimeout(() => el.remove(), 350); // fallback
+    setTimeout(() => el.remove(), 350);
   };
 
-  // Override alert() to use toasts (for legacy code)
   const _origAlert = window.alert;
   window.alert = function (msg) {
-    // Use toast only if container exists (we're on a dashboard page)
     if (document.getElementById("toast-container")) {
       window.showToast(msg, "info");
     } else {
@@ -61,21 +58,26 @@
   async function api(method, path, body) {
     const opts = { method, headers: { "Content-Type": "application/json" } };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(path, opts);
     try {
-      const data = await res.json();
-      if (!res.ok && data.error) {
-        window.showToast(data.error.message || data.error, "error");
+      const res = await fetch(path, opts);
+      try {
+        const data = await res.json();
+        if (!res.ok && data.error) {
+          window.showToast(data.error.message || data.error, "error");
+        }
+        return data;
+      } catch {
+        window.showToast("Server error — please try again", "error");
+        return { error: "Server error" };
       }
-      return data;
-    } catch {
-      window.showToast("Server error — please try again", "error");
-      return { error: "Server error" };
+    } catch (err) {
+      window.showToast("Connection failed — check your network", "error");
+      return { error: "Connection failed" };
     }
   }
 
   // ============================================================
-  // COPY TO CLIPBOARD — with visual feedback
+  // COPY TO CLIPBOARD
   // ============================================================
   window.copyToClipboard = async function (text, btnEl) {
     try {
@@ -119,7 +121,6 @@
     if (password.length < 8) { window.showToast("Password must be at least 8 characters", "warning"); return; }
     const res = await api("POST", "/api/auth/register", { email, password, name });
     if (!res.error && res.api_key) {
-      // Show API key in a toast-friendly modal-like toast
       window.showToast("Account created! API key: " + res.api_key + " — save it now!", "success", 8000);
       setTimeout(() => { window.location.href = "/views/dashboard"; }, 3000);
     }
@@ -144,7 +145,6 @@
     if (res.key) {
       el.innerHTML = '<div class="card" style="background:#065f46;border-color:#10b981"><h4 style="color:#6ee7b7;margin-bottom:8px">✅ Key Created!</h4><div style="display:flex;align-items:center;gap:8px"><pre style="flex:1;background:#1e293b;padding:12px;border-radius:8px;font-size:13px;word-break:break-all;color:#e5e7eb">' + escapeHtml(res.key) + '</pre><button class="copy-btn" onclick="window.copyToClipboard(\'' + res.key + '\', this)">📋 Copy</button></div><p style="font-size:12px;color:#6b7280;margin-top:8px">Save this key — it will not be shown again.</p></div>';
       window.showToast("API key created successfully!", "success");
-      // Auto-reload to show new key in table after 3s
       setTimeout(() => location.reload(), 3000);
     } else if (res.error) {
       el.innerHTML = '<div class="card" style="background:#7f1d1d;border-color:#ef4444"><p style="color:#fca5a5">' + escapeHtml(typeof res.error === "string" ? res.error : JSON.stringify(res.error)) + '</p></div>';
@@ -248,9 +248,6 @@
     }
   });
 
-  // ============================================================
-  // Referral: Copy Link
-  // ============================================================
   window.copyReferralLink = function () {
     const el = document.querySelector('[style*="word-break"]');
     if (el) window.copyToClipboard(el.textContent?.trim());
@@ -260,29 +257,62 @@
   // KEYBOARD SHORTCUTS
   // ============================================================
   document.addEventListener("keydown", (e) => {
-    // Escape closes mobile sidebar (Alpine x-data on body)
     if (e.key === "Escape") {
       const body = document.querySelector("body[x-data]");
       if (body && body.__x && body.__x.$data.sidebarOpen) {
         body.__x.$data.sidebarOpen = false;
       }
+      // Close model modal
+      const modal = document.getElementById("model-modal");
+      if (modal && modal.style.display === "flex") modal.style.display = "none";
     }
   });
+
+  // ============================================================
+  // UTILITY: HTML escape
+  // ============================================================
+  function escapeHtml(text) {
+    if (text == null) return "";
+    const div = document.createElement("div");
+    div.appendChild(document.createTextNode(String(text)));
+    return div.innerHTML;
+  }
+
+  // ============================================================
+  // UTILITY: Render content with code blocks and markdown
+  // ============================================================
+  function renderContent(text) {
+    let html = escapeHtml(text);
+    const parts = html.split(/(```[\s\S]*?```)/g);
+    return parts.map(function (part) {
+      if (part.startsWith("```")) {
+        var m = part.match(/^```(\w*)\n?([\s\S]*?)```$/);
+        return '<pre class="code-block">' + (m ? m[2].trim() : part) + '</pre>';
+      }
+      return part
+        .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\n/g, "<br>");
+    }).join("");
+  }
 
   // ============================================================
   // PLAYGROUND — Streaming Chat with SSE
   // ============================================================
   (function initPlayground() {
     const sendBtn = document.getElementById("pg-send");
+    const stopBtn = document.getElementById("pg-stop");
     const input = document.getElementById("pg-input");
     const messagesEl = document.getElementById("pg-messages");
     const modelSelect = document.getElementById("pg-model");
     const systemEl = document.getElementById("pg-system");
+    const statusEl = document.getElementById("pg-status");
 
     if (!sendBtn || !input || !messagesEl || !modelSelect) return;
 
     let history = [];
     let streaming = false;
+    let pgAbortController = null;
 
     // Restore conversation from localStorage
     try {
@@ -294,15 +324,28 @@
       }
     } catch {}
 
-    function appendMessage(role, content, animate = true) {
-      // Clear "empty" placeholder
+    // Restore model selection
+    const savedModel = localStorage.getItem("pg_model");
+    if (savedModel && modelSelect.querySelector('option[value="' + savedModel + '"]')) {
+      modelSelect.value = savedModel;
+    }
+    modelSelect.addEventListener("change", function () {
+      localStorage.setItem("pg_model", modelSelect.value);
+    });
+
+    function appendMessage(role, content, animate) {
       if (messagesEl.querySelector('[style*="text-align:center"]')) {
         messagesEl.innerHTML = "";
       }
       const div = document.createElement("div");
       const isUser = role === "user";
-      div.style.cssText = `margin-bottom:16px;padding:12px 16px;border-radius:12px;max-width:85%;${isUser ? "margin-left:auto;background:#0ea5e920;border:1px solid #0ea5e940" : "background:#1e293b;border:1px solid #374151"}${animate ? ";animation:fadeIn .3s ease-out" : ""}`;
-      div.innerHTML = `<div style="font-size:11px;font-weight:600;margin-bottom:4px;${isUser ? "color:#0ea5e9" : "color:#8b5cf6"}">${escapeHtml(role)}</div><div class="msg-content" style="font-size:14px;line-height:1.6;white-space:pre-wrap">${escapeHtml(content)}</div>`;
+      div.style.cssText = "margin-bottom:16px;padding:12px 16px;border-radius:12px;max-width:85%;" +
+        (isUser ? "margin-left:auto;background:#0ea5e920;border:1px solid #0ea5e940" : "background:#1e293b;border:1px solid #374151") +
+        (animate ? ";animation:fadeIn .3s ease-out" : "");
+      div.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:6px;' +
+        (isUser ? 'color:#0ea5e9' : 'color:#8b5cf6') + '">' + escapeHtml(role) +
+        '</div><div class="msg-content" style="font-size:14px;line-height:1.6">' +
+        (isUser ? escapeHtml(content) : renderContent(content)) + '</div>';
       messagesEl.appendChild(div);
       messagesEl.scrollTop = messagesEl.scrollHeight;
       return div;
@@ -313,8 +356,9 @@
         messagesEl.innerHTML = "";
       }
       const div = document.createElement("div");
-      div.style.cssText = "margin-bottom:16px;padding:12px 16px;border-radius:12px;max-width:85%;background:#1e293b;border:1px solid #374151";
-      div.innerHTML = `<div style="font-size:11px;font-weight:600;margin-bottom:4px;color:#8b5cf6">${role}</div><div class="msg-content" style="font-size:14px;line-height:1.6;white-space:pre-wrap"></div>`;
+      div.style.cssText = "margin-bottom:16px;padding:12px 16px;border-radius:12px;max-width:85%;background:#1e293b;border:1px solid #374151;animation:fadeIn .3s ease-out";
+      div.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:#8b5cf6">' + role +
+        '</div><div class="msg-content" style="font-size:14px;line-height:1.6"></div>';
       messagesEl.appendChild(div);
       messagesEl.scrollTop = messagesEl.scrollHeight;
       return div.querySelector(".msg-content");
@@ -325,40 +369,51 @@
       if (!text || streaming) return;
 
       streaming = true;
-      sendBtn.disabled = true;
-      sendBtn.textContent = "⏳";
+      sendBtn.style.display = "none";
+      if (stopBtn) stopBtn.style.display = "";
+      if (statusEl) statusEl.textContent = "⏳ Sending...";
 
-      // Add user message
-      appendMessage("user", text);
+      appendMessage("user", text, true);
       history.push({ role: "user", content: text });
       input.value = "";
 
-      // Build messages array
       const sysMsg = systemEl?.value?.trim();
       const msgList = sysMsg ? [{ role: "system", content: sysMsg }] : [];
       msgList.push(...history);
+
+      const temp = parseFloat(document.getElementById("pg-temp")?.value || "1");
+      const maxTok = parseInt(document.getElementById("pg-max-tokens")?.value || "4096");
+
+      pgAbortController = new AbortController();
+      const contentEl = appendStreamMessage("assistant");
+      contentEl.innerHTML = '<span style="color:#6b7280"><span class="spinner" style="display:inline-block;width:14px;height:14px;border-width:2px;vertical-align:middle;margin-right:8px"></span>Thinking...</span>';
+
+      let fullContent = "";
 
       try {
         const res = await fetch("/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: modelSelect.value, messages: msgList, max_tokens: 4096, stream: true }),
+          body: JSON.stringify({
+            model: modelSelect.value,
+            messages: msgList,
+            max_tokens: maxTok,
+            temperature: temp,
+            stream: true,
+          }),
+          signal: pgAbortController.signal,
         });
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          streaming = false;
-          sendBtn.disabled = false;
-          sendBtn.textContent = "Send";
-          window.showToast(errData.error?.message || "Request failed", "error");
+          const errData = await res.json().catch(function () { return {}; });
+          window.showToast(errData.error?.message || "Request failed (" + res.status + ")", "error");
+          contentEl.parentNode.remove();
           return;
         }
 
-        // Streaming response via SSE
-        const contentEl = appendStreamMessage("assistant");
+        if (statusEl) statusEl.textContent = "⚡ Streaming...";
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
-        let fullContent = "";
         let buffer = "";
 
         while (reader) {
@@ -378,42 +433,128 @@
               const delta = chunk.choices?.[0]?.delta?.content;
               if (delta) {
                 fullContent += delta;
-                contentEl.textContent = fullContent;
+                contentEl.innerHTML = renderContent(fullContent);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               }
             } catch {}
           }
         }
 
-        // Streaming done
-        history.push({ role: "assistant", content: fullContent });
+        if (fullContent) {
+          history.push({ role: "assistant", content: fullContent });
+          if (history.length > 20) history = history.slice(-20);
+          try { localStorage.setItem("pg_conversation", JSON.stringify(history)); } catch {}
 
-        // Keep last 20 messages for context (memory management)
-        if (history.length > 20) history = history.slice(-20);
-
-        // Save to localStorage
-        try { localStorage.setItem("pg_conversation", JSON.stringify(history)); } catch {}
-
-        // Add cost info if available (from webnesti metadata — not in stream, show N/A)
-        const costDiv = document.createElement("div");
-        costDiv.style.cssText = "font-size:11px;color:#6b7280;margin-top:6px";
-        costDiv.textContent = "Streamed response";
-        contentEl.parentNode.appendChild(costDiv);
+          const costDiv = document.createElement("div");
+          costDiv.style.cssText = "font-size:11px;color:#6b7280;margin-top:6px";
+          costDiv.textContent = "Streamed response";
+          contentEl.parentNode.appendChild(costDiv);
+        } else {
+          contentEl.parentNode.remove();
+        }
 
       } catch (err) {
-        window.showToast("Network error: " + err.message, "error");
+        if (err.name === "AbortError") {
+          if (fullContent) {
+            contentEl.innerHTML = renderContent(fullContent) + '<div style="color:#f59e0b;font-size:12px;margin-top:8px;font-style:italic">⏹ Generation stopped</div>';
+            history.push({ role: "assistant", content: fullContent });
+            try { localStorage.setItem("pg_conversation", JSON.stringify(history)); } catch {}
+          } else {
+            contentEl.parentNode.remove();
+          }
+          window.showToast("Generation stopped", "info", 2000);
+        } else {
+          contentEl.parentNode.remove();
+          window.showToast("Connection error: " + err.message, "error");
+        }
       }
 
       streaming = false;
-      sendBtn.disabled = false;
-      sendBtn.textContent = "Send";
+      pgAbortController = null;
+      sendBtn.style.display = "";
+      if (stopBtn) stopBtn.style.display = "none";
+      if (statusEl) statusEl.textContent = "";
+      input.focus();
     }
 
     sendBtn.addEventListener("click", sendMessage);
-    input.addEventListener("keydown", (e) => {
+    input.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
+
+    // Stop generation
+    stopBtn?.addEventListener("click", function () { pgAbortController?.abort(); });
+
+    // Clear chat
+    document.getElementById("pg-clear")?.addEventListener("click", function () {
+      if (streaming) pgAbortController?.abort();
+      history = [];
+      localStorage.removeItem("pg_conversation");
+      messagesEl.innerHTML = '<div style="text-align:center;padding:80px 0;color:#6b7280"><div style="font-size:48px;margin-bottom:12px">💬</div><p style="font-size:15px">Send a message to start</p><p style="font-size:12px;margin-top:6px">Use ```code blocks``` and **bold** in responses</p></div>';
+      window.showToast("Chat cleared", "info", 2000);
+    });
+
+    // Save conversation as JSON
+    document.getElementById("pg-save")?.addEventListener("click", function () {
+      if (!history.length) { window.showToast("No messages to save", "warning"); return; }
+      var blob = new Blob([JSON.stringify(history, null, 2)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "conversation-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      window.showToast("Conversation downloaded", "success");
+    });
   })();
+
+  // ============================================================
+  // RANGE INPUT VALUE DISPLAYS
+  // ============================================================
+  ["pg-temp", "pg-max-tokens"].forEach(function (id) {
+    var el = document.getElementById(id);
+    var valEl = document.getElementById(id + "-val");
+    if (el && valEl) {
+      el.addEventListener("input", function () {
+        valEl.textContent = id === "pg-temp" ? parseFloat(el.value).toFixed(1) : el.value;
+      });
+    }
+  });
+
+  // ============================================================
+  // MODEL DETAIL MODAL (Models page)
+  // ============================================================
+  window.showModelModal = function (d) {
+    var modal = document.getElementById("model-modal");
+    if (!modal) return;
+    var ctxK = d.ctx > 0 ? (d.ctx / 1000).toFixed(0) + "K" : "—";
+    var features = [];
+    if (+d.stream) features.push("Streaming");
+    if (+d.vision) features.push("Vision");
+    if (+d.tools) features.push("Tools");
+    document.getElementById("model-modal-content").innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">' +
+      '<div><h3 style="font-size:18px;font-weight:700;color:#e5e7eb">' + escapeHtml(d.name) + '</h3>' +
+      '<div style="font-size:13px;color:#6b7280;font-family:monospace;margin-top:4px">' + escapeHtml(d.id) + '</div></div>' +
+      '<button onclick="document.getElementById(\'model-modal\').style.display=\'none\'" ' +
+      'style="background:#1e293b;border:1px solid #374151;color:#9ca3af;cursor:pointer;font-size:16px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center">✕</button></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+      '<div class="card" style="padding:12px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em">Provider</div><div style="font-size:15px;font-weight:600;margin-top:4px">' + escapeHtml(d.provider) + '</div></div>' +
+      '<div class="card" style="padding:12px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em">Context Window</div><div style="font-size:15px;font-weight:600;margin-top:4px">' + ctxK + '</div></div>' +
+      '<div class="card" style="padding:12px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em">Input Price</div><div style="font-size:15px;font-weight:600;margin-top:4px;color:#10b981">$' + (parseFloat(d.pi) * 1e6).toFixed(2) + ' <span style="font-size:11px;color:#6b7280">/1M</span></div></div>' +
+      '<div class="card" style="padding:12px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em">Output Price</div><div style="font-size:15px;font-weight:600;margin-top:4px;color:#f59e0b">$' + (parseFloat(d.po) * 1e6).toFixed(2) + ' <span style="font-size:11px;color:#6b7280">/1M</span></div></div></div>' +
+      (features.length ? '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">' +
+        features.map(function (f) {
+          var fc = f === "Streaming" ? "#10b981" : f === "Vision" ? "#f59e0b" : "#0ea5e9";
+          return '<span style="display:inline-flex;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;background:' + fc + '20;color:' + fc + '">' + f + '</span>';
+        }).join('') + '</div>' : '') +
+      '<div style="margin-top:16px;padding-top:12px;border-top:1px solid #1f2937">' +
+      '<button class="btn-primary" style="font-size:13px;padding:8px 16px" onclick="document.getElementById(\'pg-model\') && (window.location.href=\'/views/playground\');document.getElementById(\'model-modal\').style.display=\'none\'">Try in Playground →</button></div>';
+    modal.style.display = "flex";
+  };
+
+  document.getElementById("model-modal")?.addEventListener("click", function (e) {
+    if (e.target === this) this.style.display = "none";
+  });
 
   // ============================================================
   // BYOK: Register
@@ -432,9 +573,6 @@
     }
   });
 
-  // ============================================================
-  // BYOK: Remove
-  // ============================================================
   window.removeByokKey = async function (id) {
     if (!confirm("Remove this BYOK key?")) return;
     const res = await api("DELETE", "/api/byok/" + id);
@@ -443,14 +581,4 @@
       setTimeout(() => location.reload(), 500);
     }
   };
-
-  // ============================================================
-  // UTILITY: HTML escape
-  // ============================================================
-  function escapeHtml(text) {
-    if (text == null) return "";
-    const div = document.createElement("div");
-    div.appendChild(document.createTextNode(String(text)));
-    return div.innerHTML;
-  }
 })();

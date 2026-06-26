@@ -138,6 +138,14 @@ tr:hover td{background:rgba(14,165,233,0.03)}
 .copy-btn:hover{background:#374151;color:#e5e7eb}
 .copy-btn.copied{background:#065f46;border-color:#10b981;color:#6ee7b7}
 
+/* ===== CODE BLOCKS ===== */
+.code-block{background:#1e293b;border:1px solid #374151;border-radius:8px;padding:12px 16px;font-family:'Fira Code','Consolas',monospace;font-size:13px;overflow-x:auto;white-space:pre;margin:8px 0;line-height:1.5;color:#e2e8f0}
+.code-block::before{content:attr(data-lang);display:block;font-size:10px;color:#6b7280;margin-bottom:8px;text-transform:uppercase}
+.inline-code{background:#1e293b;border:1px solid #374151;border-radius:4px;padding:1px 6px;font-family:monospace;font-size:0.9em;color:#7dd3fc}
+
+/* ===== X-CLOAK (Alpine) ===== */
+[x-cloak]{display:none!important}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
