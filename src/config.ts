@@ -8,7 +8,7 @@ const INSECURE_JWT_SECRETS = new Set([
   "change-this-to-a-random-secret-in-production",
 ]);
 
-const jwtSecret = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const jwtSecret = process.env.JWT_SECRET || "";
 
 if (isProduction && (INSECURE_JWT_SECRETS.has(jwtSecret) || jwtSecret.length < 32)) {
   throw new Error(
@@ -16,10 +16,9 @@ if (isProduction && (INSECURE_JWT_SECRETS.has(jwtSecret) || jwtSecret.length < 3
   );
 }
 
-const DEFAULT_ENCRYPTION_KEY = "dev-encryption-key-change-me-32b!!";
-const encryptionKey = process.env.ENCRYPTION_KEY || DEFAULT_ENCRYPTION_KEY;
+const encryptionKey = process.env.ENCRYPTION_KEY || "";
 
-if (isProduction && (encryptionKey === DEFAULT_ENCRYPTION_KEY || encryptionKey.length < 32)) {
+if (isProduction && encryptionKey.length < 32) {
   throw new Error(
     "ENCRYPTION_KEY must be set to a strong, random value (>= 32 chars) in production."
   );

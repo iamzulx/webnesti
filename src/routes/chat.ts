@@ -290,7 +290,8 @@ chat.post("/completions", async (c) => {
         await s.write("data: [DONE]\n\n");
       } catch (err: any) {
         streamError = true;
-        logger.error("chat stream provider error", { provider: provider.id, model: modelId, error: err?.message });
+        const safeMsg = String(err?.message || "").replace(/sk-[a-zA-Z0-9._-]+/g, "sk-***").replace(/Bearer [a-zA-Z0-9._-]+/g, "Bearer ***");
+        logger.error("chat stream provider error", { provider: provider.id, model: modelId, error: safeMsg });
         inc("chat_errors_total", 1, { model: modelId, type: "stream" });
         recordRequest(provider.id, Date.now() - startTime, false);
         await s.write(`data: ${JSON.stringify({ error: { message: "Upstream provider error", type: "provider_error" } })}\n\n`);
@@ -361,16 +362,17 @@ chat.post("/completions", async (c) => {
         },
       });
     } catch (err: any) {
-      lastErr = err?.message || "Provider error";
+      lastErr = "Upstream provider error";
       creditBalance(user.id, reservedCost);
       recordRequest(pm.provider.id, Date.now() - attemptStart, false);
-      logger.error("chat model attempt failed", { model: pm.modelId, provider: pm.provider.id, error: lastErr });
+      const safeMsg = String(err?.message || "").replace(/sk-[a-zA-Z0-9._-]+/g, "sk-***").replace(/Bearer [a-zA-Z0-9._-]+/g, "Bearer ***");
+      logger.error("chat model attempt failed", { model: pm.modelId, provider: pm.provider.id, error: safeMsg });
       inc("chat_errors_total", 1, { model: pm.modelId, type: "non_stream" });
       // try next candidate
     }
   }
 
-  return c.json({ error: { message: "All candidate models failed", type: "provider_error", detail: lastErr } }, 502);
+  return c.json({ error: { message: "All candidate models failed", type: "provider_error" } }, 502);
 });
 
 function logUsage(userId: string, apiKeyId: string, modelId: string, providerId: string,

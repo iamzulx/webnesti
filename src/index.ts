@@ -2,7 +2,6 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { cors } from "hono/cors";
-import { secureHeaders } from "hono/secure-headers";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join, resolve, sep } from "path";
@@ -30,8 +29,25 @@ import viewsRoutes from "./routes/views.js";
 
 const app = new Hono();
 
-// Security headers
-app.use("*", secureHeaders());
+// Security headers — hardened CSP + safe defaults
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("X-XSS-Protection", "0");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  c.header("Content-Security-Policy",
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: https:; " +
+    "connect-src 'self'; " +
+    "frame-ancestors 'none'"
+  );
+});
 
 // CORS — restrict to configured origins
 app.use("*", cors({ origin: config.corsOrigins }));
@@ -44,7 +60,7 @@ app.use("*", async (c, next) => {
   await next();
   const duration = Date.now() - start;
   c.header("X-Response-Time", `${duration}ms`);
-  c.header("X-Powered-By", "WebNesti");
+
 
   // Skip logging for static assets and health checks
   if (path === "/health" || path === "/metrics" || path.startsWith("/favicon")) return;

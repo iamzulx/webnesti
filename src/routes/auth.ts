@@ -41,6 +41,8 @@ function signJWT(payload: Record<string, any>): string {
   return jwt.sign(payload, config.jwtSecret, {
     algorithm: "HS256",
     expiresIn: SESSION_TTL_SECONDS,
+    audience: "webnesti-api",
+    issuer: "webnesti",
   });
 }
 

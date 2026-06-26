@@ -39,7 +39,7 @@ export async function authMiddleware(c: Context, next: Next) {
 
   let payload: jwt.JwtPayload;
   try {
-    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] });
+    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"], audience: "webnesti-api", issuer: "webnesti" });
     if (typeof decoded === "string") throw new Error("bad payload");
     payload = decoded;
   } catch {

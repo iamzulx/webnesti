@@ -61,6 +61,13 @@ admin.put("/users/:id", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { name, tier, balance } = body;
 
+  if (tier !== undefined && !["free", "starter", "pro", "enterprise", "suspended"].includes(tier)) {
+    return c.json({ error: "Invalid tier" }, 400);
+  }
+  if (balance !== undefined && (typeof balance !== "number" || !Number.isFinite(balance))) {
+    return c.json({ error: "Balance must be a finite number" }, 400);
+  }
+
   const user = dbGet("SELECT id FROM users WHERE id = ?", [userId]);
   if (!user) return c.json({ error: "User not found" }, 404);
 

@@ -18,6 +18,8 @@ export class GoogleProvider implements Provider {
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);
     return [
+      { id: "gemini-3.5-flash", object: "model", created: now, owned_by: "google" },
+      { id: "gemini-3.1-pro-preview", object: "model", created: now, owned_by: "google" },
       { id: "gemini-2.0-flash", object: "model", created: now, owned_by: "google" },
       { id: "gemini-2.5-pro-preview-05-06", object: "model", created: now, owned_by: "google" },
       { id: "gemini-1.5-pro", object: "model", created: now, owned_by: "google" },

@@ -17,6 +17,9 @@ export class DeepSeekProvider implements Provider {
     return [
       { id: "deepseek-chat", object: "model", created: now, owned_by: "deepseek" },
       { id: "deepseek-reasoner", object: "model", created: now, owned_by: "deepseek" },
+      { id: "deepseek-v4-flash", object: "model", created: now, owned_by: "deepseek" },
+      { id: "deepseek-v4-pro", object: "model", created: now, owned_by: "deepseek" },
+      { id: "deepseek-v3.2", object: "model", created: now, owned_by: "deepseek" },
     ];
   }
 

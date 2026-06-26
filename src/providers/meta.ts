@@ -16,9 +16,11 @@ export class MetaProvider implements Provider {
   listModels(): ModelInfo[] {
     const now = Math.floor(Date.now() / 1000);
     return [
+      { id: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", object: "model", created: now, owned_by: "meta" },
+      { id: "meta-llama/Llama-4-Scout-17B-16E-Instruct-FP8", object: "model", created: now, owned_by: "meta" },
+      { id: "llama-3.3-70b-versatile", object: "model", created: now, owned_by: "meta" },
       { id: "llama-3.1-70b", object: "model", created: now, owned_by: "meta" },
       { id: "llama-3.1-8b", object: "model", created: now, owned_by: "meta" },
-      { id: "llama-3.1-405b", object: "model", created: now, owned_by: "meta" },
     ];
   }
 

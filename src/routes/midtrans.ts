@@ -20,8 +20,8 @@ midtrans.post("/create", authMiddleware, async (c) => {
   const user = c.get("user");
   const body = await c.req.json().catch(() => ({}));
   const amount = parseFloat(body.amount || "0");
-  if (!amount || amount < 1000) {
-    return c.json({ error: { message: "Minimum top-up Rp1.000" } }, 400);
+  if (!Number.isFinite(amount) || amount < 1000 || amount > 100_000_000) {
+    return c.json({ error: { message: "Amount must be between Rp1.000 and Rp100.000.000" } }, 400);
   }
 
   if (!config.midtransServerKey) {

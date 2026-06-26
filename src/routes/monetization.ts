@@ -144,10 +144,14 @@ monetization.post("/referral/apply", async (c) => {
   if (!referral) return c.json({ error: "Invalid referral code" }, 404);
   if (referral.user_id === user.id) return c.json({ error: "Cannot refer yourself" }, 400);
 
-  // Apply referral
+  // Apply referral — wrap in try/catch to handle race condition on UNIQUE(referred_id)
   const useId = randomBytes(8).toString("hex");
-  dbRun("INSERT INTO referral_uses (id, referrer_id, referred_id, code, credit_amount, created_at) VALUES (?, ?, ?, ?, 5, CURRENT_TIMESTAMP)",
-    [useId, referral.user_id, user.id, code]);
+  try {
+    dbRun("INSERT INTO referral_uses (id, referrer_id, referred_id, code, credit_amount, created_at) VALUES (?, ?, ?, ?, 5, CURRENT_TIMESTAMP)",
+      [useId, referral.user_id, user.id, code]);
+  } catch {
+    return c.json({ error: "Referral code already applied (concurrent request)" }, 409);
+  }
 
   // Credit both users
   dbRun("UPDATE users SET balance = balance + 5 WHERE id = ?", [referral.user_id]); // Referrer gets $5
